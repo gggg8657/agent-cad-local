@@ -1,0 +1,14 @@
+{
+ "note": "MSR 개념설계 규칙 (교육·검토용 일반 원칙). repairable:true 인 error 만 LLM 수리 대상.",
+ "rules": [
+  {"id": "MSR-001", "name": "배수 용량", "desc": "덤프탱크 총용량 ≥ margin × 전체 연료염 인벤토리", "severity": "error", "margin": 1.0, "repairable": true},
+  {"id": "MSR-002", "name": "중력 배수", "desc": "용기 바닥 > 동결 플러그 > 덤프탱크 순으로 낮아야 함", "severity": "error", "repairable": true},
+  {"id": "MSR-003", "name": "기기 간섭", "desc": "기기 솔리드끼리 겹치지 않음 (용기·차폐·배관 관통부 제외)", "severity": "error", "tol_mm3": 1000, "repairable": true},
+  {"id": "MSR-004", "name": "루프 짝", "desc": "1차 펌프 수 = 열교환기 수 (루프당 1쌍)", "severity": "warning"},
+  {"id": "MSR-005", "name": "1차 경계", "desc": "노심·반사체·열교환기·상승관은 원자로 용기 안 (일체형)", "severity": "error", "repairable": true},
+  {"id": "MSR-006", "name": "오프가스", "desc": "핵분열 기체 제거용 He 펌프(기포 주입·제거) 계통", "severity": "warning"},
+  {"id": "MSR-007", "name": "전열면적", "desc": "열교환기 전열면적 ≥ 소요", "severity": "warning"},
+  {"id": "MSR-008", "name": "배관 유속", "desc": "1차 배관 유속 ≤ max_v m/s", "severity": "warning", "max_v": 5},
+  {"id": "MSR-009", "name": "차폐", "desc": "원자로를 감싸는 차폐 구조", "severity": "warning"}
+ ]
+}

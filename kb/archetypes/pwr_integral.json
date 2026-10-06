@@ -1,0 +1,324 @@
+{
+ "id": "pwr_integral",
+ "name": "일체형 가압경수로 (SMART·i-SMR 계열)",
+ "kind": "reactor",
+ "aliases": [
+  "일체형",
+  "SMART",
+  "스마트",
+  "i-SMR",
+  "혁신형 SMR",
+  "integral PWR",
+  "iPWR",
+  "일체형 가압경수로",
+  "SMR 가압경수로"
+ ],
+ "summary": "노심·증기발생기·가압기·냉각재펌프를 하나의 원자로 용기에 넣어 대형 1차 배관을 없앤 소형 가압경수로.",
+ "coolant": "water_pwr",
+ "source": "공개 개요 자료 수준 대표값 (IAEA SMR 개요 등) — 사내 설계값 아님, 검토 필요",
+ "design": {
+  "power_mwth": {
+   "v": 330,
+   "label": "열출력",
+   "unit": "MWth",
+   "range": [
+    50,
+    1000
+   ]
+  },
+  "power_density_mw_m3": {
+   "v": 65,
+   "label": "노심 출력밀도",
+   "unit": "MW/m³",
+   "range": [
+    40,
+    110
+   ]
+  },
+  "core_hd": {
+   "v": 1.0,
+   "label": "노심 H/D",
+   "unit": "-",
+   "range": [
+    0.8,
+    1.6
+   ]
+  },
+  "core_dT": {
+   "v": 30,
+   "label": "노심 ΔT",
+   "unit": "K",
+   "range": [
+    20,
+    45
+   ]
+  },
+  "pipe_v": {
+   "v": 8,
+   "label": "배관 유속",
+   "unit": "m/s",
+   "range": [
+    3,
+    15
+   ]
+  },
+  "n_sg": {
+   "v": 8,
+   "label": "증기발생기 수",
+   "unit": "기",
+   "range": [
+    2,
+    16
+   ]
+  },
+  "n_rcp": {
+   "v": 4,
+   "label": "냉각재 펌프 수",
+   "unit": "대",
+   "range": [
+    2,
+    8
+   ]
+  },
+  "rpv_t": {
+   "v": 200,
+   "label": "용기 두께",
+   "unit": "mm",
+   "range": [
+    100,
+    300
+   ]
+  },
+  "with_containment": {
+   "v": 0,
+   "label": "격납건물 표시",
+   "unit": "0/1",
+   "range": [
+    0,
+    1
+   ]
+  }
+ },
+ "sizing": {
+  "sg_D": "max(500, min(1400, (core_D + 1600) * pi / n_sg * 0.55))",
+  "sg_H": "core_H * 1.8",
+  "ring_R": "core_D / 2 + 350 + sg_D / 2",
+  "rcp_D": "max(450, min(sg_D, pipe_d * 3))",
+  "rcp_H": "rcp_D * 1.4",
+  "prz_D": "max(800, core_D * 0.7)",
+  "prz_H": "max(800, core_D * 0.6)"
+ },
+ "components": [
+  {
+   "id": "core",
+   "type": "core",
+   "size": {
+    "D": "core_D",
+    "H": "core_H"
+   },
+   "place": {
+    "at": {
+     "z": "0"
+    }
+   }
+  },
+  {
+   "id": "barrel",
+   "type": "core_barrel",
+   "size": {
+    "D": "core_D + 250",
+    "H": "core_H + 800",
+    "t": "60"
+   },
+   "place": {
+    "at": {
+     "z": "-400"
+    }
+   }
+  },
+  {
+   "id": "sg",
+   "type": "steam_generator",
+   "count": "n_sg",
+   "size": {
+    "D": "sg_D",
+    "H": "sg_H"
+   },
+   "place": {
+    "ring": {
+     "r": "ring_R",
+     "z": "core_top + 700"
+    }
+   }
+  },
+  {
+   "id": "prz",
+   "type": "pressurizer",
+   "size": {
+    "D": "prz_D",
+    "H": "prz_H"
+   },
+   "place": {
+    "at": {
+     "z": "sg_top + 500"
+    }
+   }
+  },
+  {
+   "id": "rpv",
+   "type": "rpv",
+   "size": {
+    "t": "rpv_t"
+   },
+   "place": {
+    "contain": {
+     "ids": [
+      "core",
+      "barrel",
+      "sg",
+      "prz"
+     ],
+     "pad": "250",
+     "pad_top": "rcp_H + 400",
+     "pad_bot": "900"
+    }
+   }
+  },
+  {
+   "id": "rcp",
+   "type": "pump",
+   "count": "n_rcp",
+   "size": {
+    "D": "rcp_D",
+    "H": "rcp_H",
+    "motor_z": "rpv_top + 300",
+    "motor_D": "rcp_D * 1.2"
+   },
+   "place": {
+    "ring": {
+     "r": "ring_R",
+     "z": "sg_top + 150",
+     "a0": "180 / n_sg"
+    }
+   }
+  },
+  {
+   "id": "cont",
+   "type": "containment",
+   "count": "with_containment",
+   "size": {
+    "t": "1200"
+   },
+   "place": {
+    "contain": {
+     "ids": [
+      "rpv",
+      "rcp"
+     ],
+     "pad": "5000",
+     "pad_top": "6000",
+     "pad_bot": "3000"
+    }
+   },
+   "detail": {
+    "operating_floor": "rpv_top + 500"
+   }
+  }
+ ],
+ "connections": [
+  {
+   "from": "sg",
+   "to": "outside",
+   "z": "sg_top - 400",
+   "d": "max(150, pipe_d * 0.4)",
+   "loop": "steam"
+  },
+  {
+   "from": "sg",
+   "to": "outside",
+   "z": "sg_bot + 400",
+   "d": "max(120, pipe_d * 0.3)",
+   "loop": "feedwater"
+  }
+ ],
+ "loops": [
+  {
+   "key": "primary",
+   "name": "1차 냉각재",
+   "path": [
+    "core",
+    "rcp",
+    "sg",
+    "core"
+   ]
+  },
+  {
+   "key": "secondary",
+   "name": "2차 (급수→증기)",
+   "path": [
+    "sg",
+    "TURBINE"
+   ]
+  }
+ ],
+ "principles": [
+  "일체형: 노심·증기발생기·가압기·펌프 흡입부가 한 원자로 용기 안 → 대형 1차 배관 파단 사고를 설계로 배제",
+  "증기발생기는 노심보다 높게 둔다 (자연순환 구동력 확보)",
+  "가압기는 용기 최상부 중앙 (증기 공간으로 1차계통 압력 유지)",
+  "냉각재 펌프는 용기 상부 원주에 배치하고 수는 증기발생기 수의 약수",
+  "1차 냉각재 ~15.5 MPa, 노심 ΔT ~30 K 대표값"
+ ],
+ "checks": [
+  {
+   "rel": "above",
+   "a": "steam_generator",
+   "b": "core"
+  },
+  {
+   "rel": "above",
+   "a": "pressurizer",
+   "b": "steam_generator"
+  },
+  {
+   "rel": "coaxial",
+   "a": "pressurizer",
+   "b": "core"
+  },
+  {
+   "rel": "inside",
+   "a": "core",
+   "b": "rpv"
+  },
+  {
+   "rel": "inside",
+   "a": "steam_generator",
+   "b": "rpv"
+  },
+  {
+   "rel": "symmetric",
+   "a": "steam_generator"
+  },
+  {
+   "rel": "symmetric",
+   "a": "pump"
+  },
+  {
+   "id": "PWR-001",
+   "expr": "n_sg % n_rcp == 0",
+   "msg": "증기발생기 수가 펌프 수의 배수가 아님 (유량 분배 불균형)",
+   "severity": "warning"
+  },
+  {
+   "id": "PWR-002",
+   "expr": "ring_R + sg_D / 2 < rpv_R",
+   "msg": "증기발생기가 용기 밖으로 나감",
+   "severity": "error"
+  }
+ ],
+ "style": {
+  "lattice": "square",
+  "pitch": 215,
+  "crdm": true,
+  "crdm_len": 2600
+ }
+}

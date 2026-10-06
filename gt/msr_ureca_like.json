@@ -1,0 +1,35 @@
+{
+ "id": "msr_ureca_like",
+ "name": "URECA 유사 MSR 개념도 (그림 판독 GT)",
+ "source": "사용자 제공 개념도 이미지(좌: 단면 투시도, 우: 외관)를 사람이 판독. 치수는 없음 — 구성·연결·배치 관계·대략 비율만 정답으로 둔다.",
+ "image": "msr_ureca_like.png",
+ "components": {"core": 1, "reactor_vessel": 1, "primary_pump": 2, "heat_exchanger": 2, "he_pump": 1, "freeze_plug": 1, "dump_tank": 4, "riser": 1, "shield_cell": 1},
+ "neutral": ["reflector", "pipe"],
+ "flows": [
+  ["core", "riser", "fuel"], ["riser", "primary_pump", "fuel"], ["primary_pump", "heat_exchanger", "fuel"], ["heat_exchanger", "core", "fuel"],
+  ["core", "freeze_plug", "drain"], ["freeze_plug", "dump_tank", "drain"], ["he_pump", "reactor_vessel", "offgas"]
+ ],
+ "relations": [
+  {"rel": "above", "a": "primary_pump", "b": "heat_exchanger", "why": "펌프 모터가 열교환기 위"},
+  {"rel": "above", "a": "heat_exchanger", "b": "core", "why": "열교환기가 노심보다 높음 (자연순환 유리)"},
+  {"rel": "above", "a": "he_pump", "b": "core"},
+  {"rel": "coaxial", "a": "he_pump", "b": "core", "why": "He 펌프는 상부 중앙"},
+  {"rel": "coaxial", "a": "riser", "b": "core"},
+  {"rel": "below", "a": "freeze_plug", "b": "core"},
+  {"rel": "coaxial", "a": "freeze_plug", "b": "core", "why": "동결 플러그는 용기 바닥 중앙"},
+  {"rel": "below", "a": "dump_tank", "b": "freeze_plug", "why": "중력 배수"},
+  {"rel": "symmetric", "a": "primary_pump", "why": "좌우 대칭"},
+  {"rel": "symmetric", "a": "heat_exchanger"},
+  {"rel": "same_azimuth", "a": "primary_pump", "b": "heat_exchanger", "why": "펌프가 각 열교환기 바로 위"},
+  {"rel": "inside", "a": "core", "b": "reactor_vessel"},
+  {"rel": "inside", "a": "heat_exchanger", "b": "reactor_vessel", "why": "일체형(integral) 배치"},
+  {"rel": "grid", "a": "dump_tank", "n": [2, 2]}
+ ],
+ "proportions": [
+  {"what": "assembly_height / core.H", "value": 4.6, "tol": 0.35},
+  {"what": "assembly_width / core.H", "value": 2.3, "tol": 0.4},
+  {"what": "heat_exchanger.H / core.H", "value": 1.2, "tol": 0.4},
+  {"what": "dump_tank.H / core.H", "value": 0.9, "tol": 0.4}
+ ],
+ "weights": {"components": 0.3, "flows": 0.2, "relations": 0.35, "proportions": 0.15}
+}

@@ -1,0 +1,30 @@
+{
+ "standard": "KAERI_ICT_V1",
+ "note": "회사/프로젝트 CAD 표준. 레이어 이름·색(ACI)·선종류를 여기서만 바꾼다. protected: 에이전트가 수정·삭제할 수 없는 레이어 패턴.",
+ "font": "malgun.ttf",
+ "protected": ["A-*", "S-*", "DEFPOINTS"],
+ "layers": {
+  "A-WALL":         {"color": 8, "lt": "CONTINUOUS", "desc": "건축 벽/공간 경계"},
+  "A-ROOM":         {"color": 8, "lt": "CONTINUOUS", "desc": "실명"},
+  "ICT-TITLE":      {"color": 7, "lt": "CONTINUOUS", "desc": "도곽·표제란"},
+  "ICT-TEXT":       {"color": 7, "lt": "CONTINUOUS", "desc": "주석"},
+  "ICT-DIM":        {"color": 3, "lt": "CONTINUOUS", "desc": "치수"},
+  "ICT-CCTV":       {"color": 1, "lt": "CONTINUOUS", "desc": "CCTV"},
+  "ICT-CCTV-FOV":   {"color": 9, "lt": "DASHED",     "desc": "CCTV 화각"},
+  "ICT-WIFI":       {"color": 5, "lt": "CONTINUOUS", "desc": "무선 AP"},
+  "ICT-WIFI-COV":   {"color": 151, "lt": "DASHED",   "desc": "AP 커버리지"},
+  "ICT-PHONE":      {"color": 6, "lt": "CONTINUOUS", "desc": "비상통화·방송·안내"},
+  "ICT-NETWORK":    {"color": 4, "lt": "CONTINUOUS", "desc": "스위치·서버·랙 장비"},
+  "ICT-RACK":       {"color": 4, "lt": "CONTINUOUS", "desc": "랙 외형"},
+  "ICT-TRAY":       {"color": 42, "lt": "CONTINUOUS", "desc": "케이블 트레이"},
+  "ICT-UTP":        {"color": 150, "lt": "CONTINUOUS", "desc": "UTP(CAT6) 인입"},
+  "ICT-FIBER":      {"color": 30, "lt": "DASHED",    "desc": "광(SMF) 간선"},
+  "ICT-RISER":      {"color": 2, "lt": "CONTINUOUS", "desc": "수직 간선(EPS/TPS)"},
+  "ICT-ANNOTATION": {"color": 2, "lt": "CONTINUOUS", "desc": "에이전트 변경 표시"},
+  "M-PART":         {"color": 7, "lt": "CONTINUOUS", "desc": "부품 외형"},
+  "M-HIDDEN":       {"color": 8, "lt": "HIDDEN",     "desc": "숨은선"},
+  "M-CENTER":       {"color": 1, "lt": "CENTER",     "desc": "중심선"},
+  "M-DIM":          {"color": 3, "lt": "CONTINUOUS", "desc": "치수"},
+  "M-TEXT":         {"color": 7, "lt": "CONTINUOUS", "desc": "주석"}
+ }
+}

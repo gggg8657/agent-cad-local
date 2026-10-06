@@ -1,0 +1,28 @@
+# runtime / user data
+_workspace/
+_data/
+uploads/
+outputs/
+out/
+*.log
+.server.pid
+.selftest.ok
+# python / env
+__pycache__/
+*.pyc
+venv/
+.venv/
+wheels/
+dist-offline/
+node_modules/
+# models / caches
+models/
+weights/
+checkpoints/
+*.ckpt
+*.pt
+*.safetensors
+.cache/
+# user-provided reference image (source unverified) — not redistributed
+gt/msr_ureca_like.png
+kb/overrides/*.json

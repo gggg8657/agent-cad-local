@@ -1,0 +1,21 @@
+{
+ "id": "msr_integral", "name": "일체형 용융염원자로 (MSR)", "kind": "reactor", "builder": "msr",
+ "aliases": ["MSR", "용융염", "용융염원자로", "molten salt", "FLiBe", "URECA", "동결 플러그", "덤프탱크"],
+ "summary": "액체 연료염이 흑연 노심을 흐르고, 펌프·열교환기가 같은 용기에 든 일체형 MSR. 비상 시 동결 플러그가 녹아 덤프탱크로 중력 배수.",
+ "coolant": "FLiBe",
+ "source": "공개 문헌(MSRE 규모) 수준 대표값 — 사내 검토 필요. 전용 엔진(cad/assembly.py) 사용",
+ "design": {
+  "power_mwth": {"v": 20, "label": "열출력", "unit": "MWth", "range": [1, 500]},
+  "power_density_mw_m3": {"v": 5, "label": "노심 출력밀도", "unit": "MW/m³", "range": [3, 30]},
+  "core_dT": {"v": 100, "label": "노심 ΔT", "unit": "K", "range": [50, 150]},
+  "drain_margin": {"v": 1.2, "label": "덤프 용량 여유", "unit": "배", "range": [1.0, 2.0]}
+ },
+ "components_note": "core·reflector·reactor_vessel·riser·primary_pump·heat_exchanger·he_pump·freeze_plug·dump_tank·shield_cell (count 로 지정)",
+ "principles": [
+  "일체형: 노심·열교환기·펌프 흡입부가 한 용기 안. 열교환기는 노심보다 높게(자연순환), 펌프는 각 열교환기 위 → 펌프 수 = 열교환기 수",
+  "노심 출구 고온 염이 중앙 상승관으로 올라가 펌프 → 열교환기 → 하강관으로 노심 하부 재진입",
+  "핵분열 기체(Xe/Kr) 제거를 위해 He 기포 주입·제거 계통(He 펌프)을 상부 중앙에",
+  "비상 시 노심 바닥 동결 플러그가 녹아 염이 중력으로 덤프탱크에 배수 → 덤프탱크 총용량 ≥ 전체 염 인벤토리 × 여유"
+ ],
+ "checks": []
+}

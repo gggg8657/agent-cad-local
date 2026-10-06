@@ -1,0 +1,167 @@
+{
+ "id": "msr_3loop_synth",
+ "name": "3루프 MSR 단면·평면 (자체 생성 GT, 글자 없음)",
+ "source": "에이전트가 만든 30 MWth 3루프 설계의 GA 를 글자·치수 없이 렌더한 합성 GT. 이미지 판독만으로 개수(펌프·열교환기 3, 덤프탱크 3)를 맞히는지 보는 대조 시험용.",
+ "image": "msr_3loop_synth.png",
+ "components": {
+  "core": 1,
+  "riser": 1,
+  "heat_exchanger": 3,
+  "reactor_vessel": 1,
+  "primary_pump": 3,
+  "he_pump": 1,
+  "freeze_plug": 1,
+  "dump_tank": 3,
+  "shield_cell": 1
+ },
+ "neutral": [
+  "reflector",
+  "pipe"
+ ],
+ "flows": [
+  [
+   "core",
+   "riser",
+   "fuel"
+  ],
+  [
+   "riser",
+   "primary_pump",
+   "fuel"
+  ],
+  [
+   "primary_pump",
+   "heat_exchanger",
+   "fuel"
+  ],
+  [
+   "heat_exchanger",
+   "core",
+   "fuel"
+  ],
+  [
+   "core",
+   "freeze_plug",
+   "drain"
+  ],
+  [
+   "freeze_plug",
+   "dump_tank",
+   "drain"
+  ],
+  [
+   "he_pump",
+   "reactor_vessel",
+   "offgas"
+  ]
+ ],
+ "relations": [
+  {
+   "rel": "above",
+   "a": "primary_pump",
+   "b": "heat_exchanger",
+   "why": "펌프 모터가 열교환기 위"
+  },
+  {
+   "rel": "above",
+   "a": "heat_exchanger",
+   "b": "core",
+   "why": "열교환기가 노심보다 높음 (자연순환 유리)"
+  },
+  {
+   "rel": "above",
+   "a": "he_pump",
+   "b": "core"
+  },
+  {
+   "rel": "coaxial",
+   "a": "he_pump",
+   "b": "core",
+   "why": "He 펌프는 상부 중앙"
+  },
+  {
+   "rel": "coaxial",
+   "a": "riser",
+   "b": "core"
+  },
+  {
+   "rel": "below",
+   "a": "freeze_plug",
+   "b": "core"
+  },
+  {
+   "rel": "coaxial",
+   "a": "freeze_plug",
+   "b": "core",
+   "why": "동결 플러그는 용기 바닥 중앙"
+  },
+  {
+   "rel": "below",
+   "a": "dump_tank",
+   "b": "freeze_plug",
+   "why": "중력 배수"
+  },
+  {
+   "rel": "symmetric",
+   "a": "primary_pump",
+   "why": "좌우 대칭"
+  },
+  {
+   "rel": "symmetric",
+   "a": "heat_exchanger"
+  },
+  {
+   "rel": "same_azimuth",
+   "a": "primary_pump",
+   "b": "heat_exchanger",
+   "why": "펌프가 각 열교환기 바로 위"
+  },
+  {
+   "rel": "inside",
+   "a": "core",
+   "b": "reactor_vessel"
+  },
+  {
+   "rel": "inside",
+   "a": "heat_exchanger",
+   "b": "reactor_vessel",
+   "why": "일체형(integral) 배치"
+  },
+  {
+   "rel": "grid",
+   "a": "dump_tank",
+   "n": [
+    1,
+    3
+   ]
+  }
+ ],
+ "proportions": [
+  {
+   "what": "assembly_height / core.H",
+   "value": 5.26,
+   "tol": 0.3
+  },
+  {
+   "what": "assembly_width / core.H",
+   "value": 1.22,
+   "tol": 0.3
+  },
+  {
+   "what": "heat_exchanger.H / core.H",
+   "value": 1.3,
+   "tol": 0.3
+  },
+  {
+   "what": "dump_tank.H / core.H",
+   "value": 0.87,
+   "tol": 0.3
+  }
+ ],
+ "weights": {
+  "components": 0.3,
+  "flows": 0.2,
+  "relations": 0.35,
+  "proportions": 0.15
+ }
+}

@@ -1,0 +1,28 @@
+{
+ "note": "용융염원자로(MSR) 계통 조립 라이브러리 — 개념설계 교육/검토용 일반값(공개 문헌 수준, MSRE 규모 참고). 실제 설계값 아님. 단위 mm·MW·K. role: equipment(부피 있는 기기)·container(감싸는 구조)·pipe.",
+ "components": {
+  "core":           {"label": "노심",        "role": "equipment", "material": "graphite+fuel salt", "rgb": [235, 120, 170], "alpha": 1.0, "layer": "MSR-CORE",  "color": 6},
+  "reflector":      {"label": "반사체",      "role": "equipment", "material": "graphite", "rgb": [120, 70, 60], "alpha": 1.0, "layer": "MSR-CORE", "color": 14},
+  "reactor_vessel": {"label": "원자로 용기", "role": "container", "material": "Hastelloy-N", "rgb": [190, 195, 200], "alpha": 0.25, "layer": "MSR-VESSEL", "color": 8},
+  "riser":          {"label": "상승관",      "role": "equipment", "material": "Hastelloy-N", "rgb": [120, 130, 40], "alpha": 1.0, "layer": "MSR-PRIMARY", "color": 52},
+  "primary_pump":   {"label": "1차 펌프",    "role": "equipment", "material": "Hastelloy-N", "rgb": [55, 60, 75], "alpha": 1.0, "layer": "MSR-PUMP", "color": 5},
+  "heat_exchanger": {"label": "열교환기",    "role": "equipment", "material": "Hastelloy-N", "rgb": [70, 80, 110], "alpha": 1.0, "layer": "MSR-HX", "color": 4},
+  "he_pump":        {"label": "He 펌프",     "role": "equipment", "material": "SUS316", "rgb": [90, 70, 60], "alpha": 1.0, "layer": "MSR-GAS", "color": 3},
+  "freeze_plug":    {"label": "동결 플러그", "role": "equipment", "material": "Hastelloy-N", "rgb": [80, 160, 220], "alpha": 1.0, "layer": "MSR-DRAIN", "color": 140},
+  "dump_tank":      {"label": "덤프탱크",    "role": "equipment", "material": "Hastelloy-N", "rgb": [190, 195, 165], "alpha": 1.0, "layer": "MSR-DRAIN", "color": 30},
+  "shield_cell":    {"label": "차폐 구조",   "role": "container", "material": "concrete", "rgb": [60, 55, 50], "alpha": 1.0, "layer": "MSR-SHIELD", "color": 250},
+  "pipe":           {"label": "배관",        "role": "pipe", "material": "Hastelloy-N", "rgb": [150, 150, 150], "alpha": 1.0, "layer": "MSR-PIPE", "color": 9}
+ },
+ "salts": {
+  "FLiBe":       {"rho": 1940, "cp": 2386, "label": "LiF-BeF2 (FLiBe)"},
+  "FLiNaK":      {"rho": 2020, "cp": 1880, "label": "LiF-NaF-KF (FLiNaK)"},
+  "NaCl-MgCl2":  {"rho": 1680, "cp": 1150, "label": "NaCl-MgCl2 (염화물, 근사)"}
+ },
+ "densities_kg_m3": {"graphite": 1800, "Hastelloy-N": 8860, "SUS316": 8000, "concrete": 2300},
+ "defaults": {
+  "power_mwth": 20, "salt": "FLiBe", "core_dT": 100, "power_density_mw_m3": 5.0, "salt_fraction": 0.225, "loop_inventory_factor": 0.8,
+  "core_hd": 1.1, "reflector_t": 150, "hx_U": 1500, "hx_dTlm": 60, "hx_tube_od": 12.7, "hx_pitch_ratio": 1.3, "hx_length_ratio": 1.1,
+  "pipe_velocity": 3.0, "drain_margin": 1.2, "tank_hd": 1.4, "vessel_wall": 30, "gap": 150, "plenum": 300, "gas_plenum": 400,
+  "n_pump": 2, "n_hx": 2, "n_dump": 4, "shield_t": 600
+ }
+}

@@ -1,0 +1,230 @@
+{
+ "id": "htgr_prismatic",
+ "name": "블록형 고온가스로 (HTGR)",
+ "kind": "reactor",
+ "aliases": [
+  "HTGR",
+  "VHTR",
+  "고온가스로",
+  "초고온가스로",
+  "블록형",
+  "헬륨냉각",
+  "가스로",
+  "수소생산로"
+ ],
+ "summary": "흑연 블록 노심을 헬륨으로 냉각, 원자로 용기와 증기발생기(또는 IHX) 용기를 교차 덕트로 잇는 side-by-side 배치.",
+ "coolant": "helium",
+ "source": "공개 개요 자료 수준 대표값 — 사내 검토 필요",
+ "design": {
+  "power_mwth": {
+   "v": 250,
+   "label": "열출력",
+   "unit": "MWth",
+   "range": [
+    50,
+    600
+   ]
+  },
+  "power_density_mw_m3": {
+   "v": 6,
+   "label": "노심 출력밀도",
+   "unit": "MW/m³",
+   "range": [
+    3,
+    8
+   ]
+  },
+  "core_hd": {
+   "v": 1.8,
+   "label": "노심 H/D",
+   "unit": "-",
+   "range": [
+    1.2,
+    2.5
+   ]
+  },
+  "core_dT": {
+   "v": 400,
+   "label": "노심 ΔT (출구 ~750°C)",
+   "unit": "K",
+   "range": [
+    300,
+    550
+   ]
+  },
+  "pipe_v": {
+   "v": 40,
+   "label": "덕트 유속",
+   "unit": "m/s",
+   "range": [
+    20,
+    60
+   ]
+  },
+  "refl_t": {
+   "v": 1000,
+   "label": "흑연 반사체 두께",
+   "unit": "mm",
+   "range": [
+    600,
+    1500
+   ]
+  }
+ },
+ "sizing": {
+  "duct_d": "max(1200, sqrt(4 * Q_vol / (pi * pipe_v)) * 1000)",
+  "sg_D": "max(3000, (core_D + 2 * refl_t) * 0.6)",
+  "sg_H": "max(15000, core_H * 1.6)",
+  "circ_D": "max(1200, duct_d)",
+  "circ_H": "circ_D * 1.2"
+ },
+ "components": [
+  {
+   "id": "core",
+   "type": "core",
+   "size": {
+    "D": "core_D",
+    "H": "core_H"
+   },
+   "place": {
+    "at": {
+     "z": "0"
+    }
+   }
+  },
+  {
+   "id": "refl",
+   "type": "reflector",
+   "size": {
+    "D": "core_D + 2 * refl_t",
+    "H": "core_H + 2 * refl_t",
+    "t": "refl_t"
+   },
+   "place": {
+    "at": {
+     "z": "-refl_t"
+    }
+   }
+  },
+  {
+   "id": "rpv",
+   "type": "rpv",
+   "size": {
+    "t": "180"
+   },
+   "place": {
+    "contain": {
+     "ids": [
+      "core",
+      "refl"
+     ],
+     "pad": "500",
+     "pad_top": "4000",
+     "pad_bot": "2500"
+    }
+   }
+  },
+  {
+   "id": "sg",
+   "type": "steam_generator",
+   "label": "증기발생기 용기",
+   "size": {
+    "D": "sg_D",
+    "H": "sg_H"
+   },
+   "place": {
+    "beside": {
+     "of": "rpv",
+     "dir": "+x",
+     "gap": "2500",
+     "z": "rpv_bot + 1500"
+    }
+   }
+  },
+  {
+   "id": "circ",
+   "type": "circulator",
+   "size": {
+    "D": "circ_D",
+    "H": "circ_H",
+    "motor_z": "sg_top + circ_H + 200",
+    "motor_D": "circ_D"
+   },
+   "place": {
+    "at": {
+     "z": "sg_top",
+     "xy": [
+      "sg_x",
+      "sg_y"
+     ]
+    }
+   }
+  }
+ ],
+ "connections": [
+  {
+   "from": "rpv",
+   "to": "sg",
+   "z": "rpv_bot + 3500",
+   "d": "duct_d",
+   "loop": "primary",
+   "label": "교차 덕트 (동심 이중관)"
+  }
+ ],
+ "loops": [
+  {
+   "key": "primary",
+   "name": "1차 헬륨",
+   "path": [
+    "core",
+    "sg",
+    "circ",
+    "core"
+   ]
+  },
+  {
+   "key": "secondary",
+   "name": "2차 증기",
+   "path": [
+    "sg",
+    "TURBINE"
+   ]
+  }
+ ],
+ "principles": [
+  "원자로 용기와 증기발생기 용기를 나란히 두고 교차 덕트(동심 이중관: 안쪽 고온 출구, 바깥 저온 입구)로 연결",
+  "헬륨 순환기는 증기발생기 용기 상부 (저온 측)",
+  "노심은 흑연 블록, 출력밀도가 낮아(수 MW/m³) 노심이 크고 길다 → 고유 안전성(수동 잔열 제거)",
+  "흑연 반사체가 노심을 둘러싼다"
+ ],
+ "checks": [
+  {
+   "rel": "inside",
+   "a": "core",
+   "b": "rpv"
+  },
+  {
+   "rel": "inside",
+   "a": "reflector",
+   "b": "rpv"
+  },
+  {
+   "rel": "above",
+   "a": "circulator",
+   "b": "steam_generator"
+  },
+  {
+   "rel": "beside",
+   "a": "steam_generator",
+   "b": "rpv"
+  }
+ ],
+ "style": {
+  "lattice": "hex",
+  "pitch": 360,
+  "crdm": true,
+  "crdm_len": 3000,
+  "fuel_mat": "fuel",
+  "refl_mat": "graphite"
+ }
+}

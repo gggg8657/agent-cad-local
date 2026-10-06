@@ -1,0 +1,17 @@
+{
+ "note": "ICT 설계 규칙. 수치·심각도만 바꾸면 되고 LLM 재학습은 필요 없다. enabled:false 로 끄기. repairable:true 인 error 만 LLM 수리 루프 대상.",
+ "rules": [
+  {"id": "ICT-001", "name": "코어 도달성", "desc": "모든 말단 장비는 접속 스위치를 거쳐 코어 스위치까지 경로가 있어야 한다", "severity": "error", "repairable": true},
+  {"id": "ICT-002", "name": "코어 이중화", "desc": "코어 스위치 2대 이상, 각 접속 스위치는 코어 2대에 이중 귀속", "severity": "warning", "min_core_switches": 2},
+  {"id": "ICT-003", "name": "스위치 포트 여유", "desc": "접속 스위치 사용 포트 ≤ 포트 수 × (1 − margin). 초과 수용은 error", "severity": "warning", "margin": 0.2},
+  {"id": "ICT-004", "name": "ID 중복", "desc": "장비 ID는 프로젝트에서 유일", "severity": "error", "repairable": true},
+  {"id": "ICT-005", "name": "UTP 최대 길이", "desc": "CAT6 영구링크 90 m 이하 (TIA-568). 초과 시 현장 분기실·광 미디어컨버터 필요", "severity": "error", "max_m": 90, "repairable": true},
+  {"id": "ICT-006", "name": "랙 실장 여유", "desc": "랙 사용 U ≤ 42U × (1 − margin)", "severity": "warning", "margin": 0.2},
+  {"id": "ICT-007", "name": "공간 내부 배치", "desc": "장비 좌표가 소속 공간 경계 안", "severity": "error", "repairable": true},
+  {"id": "ICT-008", "name": "AP 커버리지", "desc": "AP가 있는 공간의 커버 면적 비율 ≥ min_ratio", "severity": "warning", "min_ratio": 0.9},
+  {"id": "ICT-009", "name": "PoE 예산", "desc": "접속 스위치 PoE 소비 합 ≤ 예산 × (1 − margin)", "severity": "warning", "margin": 0.2},
+  {"id": "ICT-010", "name": "업링크 수", "desc": "스위치 업링크 사용 수 ≤ 업링크 포트 수", "severity": "error"},
+  {"id": "ICT-011", "name": "NVR 채널", "desc": "CCTV 수 ≤ NVR 채널 합", "severity": "warning"}
+ ],
+ "cable": {"slack_end_m": 3, "route_margin": 0.1, "floor_height_mm": 5000}
+}

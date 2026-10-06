@@ -1,0 +1,184 @@
+{
+ "id": "hot_cell",
+ "name": "핫셀 (차폐 셀 시설)",
+ "kind": "facility",
+ "aliases": [
+  "핫셀",
+  "hot cell",
+  "차폐셀",
+  "차폐 셀",
+  "조사후시험",
+  "PIE",
+  "매니퓰레이터",
+  "원격취급"
+ ],
+ "summary": "두꺼운 콘크리트 차폐벽으로 둘러싼 셀을 일렬로 두고, 앞벽에 차폐창과 원격 매니퓰레이터를 단 방사성 물질 취급 시설.",
+ "coolant": "none",
+ "source": "일반 시설 개념 대표값 — 사내 검토 필요",
+ "design": {
+  "n_cell": {
+   "v": 3,
+   "label": "셀 수",
+   "unit": "칸",
+   "range": [
+    1,
+    10
+   ]
+  },
+  "cell_W": {
+   "v": 3000,
+   "label": "셀 내부 폭",
+   "unit": "mm",
+   "range": [
+    1500,
+    8000
+   ]
+  },
+  "cell_D": {
+   "v": 3000,
+   "label": "셀 내부 깊이",
+   "unit": "mm",
+   "range": [
+    1500,
+    8000
+   ]
+  },
+  "cell_H": {
+   "v": 4000,
+   "label": "셀 내부 높이",
+   "unit": "mm",
+   "range": [
+    2500,
+    8000
+   ]
+  },
+  "wall_t": {
+   "v": 1000,
+   "label": "차폐벽 두께 (콘크리트)",
+   "unit": "mm",
+   "range": [
+    300,
+    2000
+   ]
+  },
+  "n_manip": {
+   "v": 2,
+   "label": "셀당 매니퓰레이터",
+   "unit": "대",
+   "range": [
+    1,
+    4
+   ]
+  }
+ },
+ "sizing": {
+  "pitch": "cell_W + wall_t",
+  "row_L": "n_cell * pitch + wall_t"
+ },
+ "components": [
+  {
+   "id": "cell",
+   "type": "cell",
+   "count": "n_cell",
+   "size": {
+    "W": "cell_W + 2 * wall_t",
+    "L": "cell_D + 2 * wall_t",
+    "H": "cell_H + wall_t",
+    "t": "wall_t"
+   },
+   "place": {
+    "line": {
+     "pitch": "pitch",
+     "z": "0",
+     "dir": "x"
+    }
+   }
+  },
+  {
+   "id": "win",
+   "type": "window",
+   "count": "n_cell",
+   "size": {
+    "W": "min(1200, cell_W * 0.35)",
+    "L": "wall_t + 40",
+    "H": "900"
+   },
+   "place": {
+    "line": {
+     "pitch": "pitch",
+     "z": "wall_t + 1200",
+     "dir": "x",
+     "cy": "-(cell_D + wall_t) / 2"
+    }
+   }
+  },
+  {
+   "id": "manip",
+   "type": "manipulator",
+   "count": "n_cell * n_manip",
+   "size": {
+    "D": "200",
+    "H": "wall_t + 1800",
+    "axis": "y"
+   },
+   "place": {
+    "line": {
+     "pitch": "pitch",
+     "per": "n_manip",
+     "offsets": "cell_W * 0.32",
+     "z": "wall_t + 2300",
+     "dir": "x",
+     "cy": "-(cell_D + wall_t) / 2 - 900"
+    }
+   }
+  },
+  {
+   "id": "crane",
+   "type": "crane",
+   "size": {
+    "W": "row_L",
+    "L": "600",
+    "H": "500"
+   },
+   "place": {
+    "at": {
+     "z": "cell_top + 1500"
+    }
+   }
+  }
+ ],
+ "connections": [],
+ "loops": [
+  {
+   "key": "ventilation",
+   "name": "배기 (음압 유지)",
+   "path": [
+    "cell",
+    "HEPA"
+   ]
+  }
+ ],
+ "principles": [
+  "차폐벽 두께는 취급 선원 세기로 결정 (콘크리트 수백 mm~2 m)",
+  "앞벽(운전 구역 쪽)에 셀마다 차폐창 1개와 매니퓰레이터 1쌍",
+  "셀은 운전 구역보다 낮은 압력(음압)으로 유지, 배기는 HEPA 필터 경유",
+  "셀 상부에 반입·반출용 크레인/해치"
+ ],
+ "checks": [
+  {
+   "rel": "grid",
+   "a": "cell",
+   "n": [
+    "n_cell",
+    1
+   ]
+  },
+  {
+   "id": "HC-001",
+   "expr": "wall_t >= 300",
+   "msg": "차폐벽이 너무 얇음",
+   "severity": "warning"
+  }
+ ],
+ "style": {}
+}

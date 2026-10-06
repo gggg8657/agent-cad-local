@@ -1,0 +1,31 @@
+agent-cad-local
+===============
+
+This package uses (unmodified, installed from PyPI):
+
+  build123d — https://github.com/gumyr/build123d — Apache-2.0
+    cadquery-ocp (OCP) — https://github.com/CadQuery/OCP — Apache-2.0
+    Open CASCADE Technology — https://dev.opencascade.org — LGPL-2.1 with OCCT exception
+  ezdxf — https://github.com/mozman/ezdxf — MIT
+  shapely — https://github.com/shapely/shapely — BSD-3-Clause (GEOS: LGPL-2.1)
+
+  pillow — https://github.com/python-pillow/Pillow — MIT-CMU (HPND)
+
+Bundled (static/, unmodified):
+  NanumGothic.ttf (static/fonts) — SIL Open Font License 1.1, © NAVER Corp. (static/fonts/OFL.txt)
+  three.js r128 (three.min.js, examples/js GLTFLoader.js, OrbitControls.js) — MIT, Copyright © 2010-2021 three.js authors
+
+Design references (no code copied):
+  earthtojake/text-to-cad — 3D/DXF CAD agent skills
+  jeremylongshore/cad-ai-agent — "LLM plans typed operations, deterministic engine edits DXF" pattern
+
+GT images: gt/msr_ureca_like.png — 사용자 제공 개념도(출처 확인 전이라 공개 저장소에는 넣지 않음; 판독 정답 json 만 포함); gt/msr_3loop_synth.png — 본 도구가 생성
+
+Files authored for this package (MIT): app.py, ui.html, cad/*.py, prompts/*.md, rules/*.json, library/*.json, standards/*.json,
+  sample/make_sample.py, gt/*.json, bench_gt.py, selftest.py, setup.sh, pack.sh, README.md, GOAL.md
+
+LLM (not bundled): called via an OpenAI-compatible API; default deployment is Ollama (https://github.com/ollama/ollama, MIT)
+  serving Google Gemma (gemma4:31b, https://ai.google.dev/gemma — see Gemma's terms of use).
+
+This package: Copyright (c) 2026 gggg8657 <dongjukim.dev@gmail.com>
+화면 하단·메타데이터의 저작자 표기는 지우거나 바꾸지 마세요.

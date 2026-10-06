@@ -1,0 +1,7 @@
+{
+ "note": "부품(2D/3D) 검증 규칙 파라미터. 단위 mm.",
+ "min_web_mm": 1.0,
+ "min_wall_mm": 1.0,
+ "min_hole_to_thickness": 1.0,
+ "bbox_tol_mm": 0.05
+}

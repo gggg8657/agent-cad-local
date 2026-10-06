@@ -1,0 +1,230 @@
+{
+ "id": "spent_fuel_pool",
+ "name": "사용후핵연료 저장조",
+ "kind": "facility",
+ "aliases": [
+  "사용후핵연료",
+  "저장조",
+  "SFP",
+  "spent fuel pool",
+  "핵연료 저장",
+  "습식 저장"
+ ],
+ "summary": "물로 차폐·냉각하는 직사각 저장조 바닥에 저장 랙을 격자 배치하고, 2계열 냉각 펌프·열교환기로 붕괴열을 제거.",
+ "coolant": "water_lp",
+ "source": "일반 개념 대표값 — 사내 검토 필요",
+ "design": {
+  "rack_nx": {
+   "v": 4,
+   "label": "랙 배열 X",
+   "unit": "열",
+   "range": [
+    1,
+    12
+   ]
+  },
+  "rack_ny": {
+   "v": 3,
+   "label": "랙 배열 Y",
+   "unit": "행",
+   "range": [
+    1,
+    12
+   ]
+  },
+  "rack_W": {
+   "v": 2000,
+   "label": "랙 한 변",
+   "unit": "mm",
+   "range": [
+    1000,
+    3000
+   ]
+  },
+  "rack_H": {
+   "v": 4500,
+   "label": "랙 높이",
+   "unit": "mm",
+   "range": [
+    3000,
+    5500
+   ]
+  },
+  "water_above": {
+   "v": 7500,
+   "label": "랙 위 수심",
+   "unit": "mm",
+   "range": [
+    5000,
+    10000
+   ]
+  },
+  "n_train": {
+   "v": 2,
+   "label": "냉각 계열 수",
+   "unit": "계열",
+   "range": [
+    1,
+    3
+   ]
+  }
+ },
+ "sizing": {
+  "pool_W": "rack_nx * (rack_W + 300) + 3000",
+  "pool_L": "rack_ny * (rack_W + 300) + 3000",
+  "pool_H": "rack_H + water_above + 1000",
+  "pump_D": "700",
+  "pump_H": "900",
+  "hx_D": "900",
+  "hx_H": "2700"
+ },
+ "components": [
+  {
+   "id": "pool",
+   "type": "pool",
+   "label": "저장조",
+   "size": {
+    "W": "pool_W",
+    "L": "pool_L",
+    "H": "pool_H",
+    "t": "1500"
+   },
+   "place": {
+    "at": {
+     "z": "0"
+    }
+   }
+  },
+  {
+   "id": "rack",
+   "type": "rack",
+   "count": "rack_nx * rack_ny",
+   "size": {
+    "W": "rack_W",
+    "L": "rack_W",
+    "H": "rack_H"
+   },
+   "place": {
+    "grid": {
+     "nx": "rack_nx",
+     "ny": "rack_ny",
+     "pitch": "rack_W + 300",
+     "z": "300"
+    }
+   }
+  },
+  {
+   "id": "pump",
+   "type": "pump",
+   "count": "n_train",
+   "size": {
+    "D": "pump_D",
+    "H": "pump_H",
+    "motor_z": "pump_H + 200",
+    "motor_D": "pump_D"
+   },
+   "place": {
+    "line": {
+     "pitch": "2500",
+     "z": "0",
+     "dir": "y",
+     "cx": "pool_W / 2 + 1500 + 2500"
+    }
+   }
+  },
+  {
+   "id": "hx",
+   "type": "heat_exchanger",
+   "count": "n_train",
+   "size": {
+    "D": "hx_D",
+    "H": "hx_H"
+   },
+   "place": {
+    "line": {
+     "pitch": "2500",
+     "z": "0",
+     "dir": "y",
+     "cx": "pool_W / 2 + 1500 + 5500"
+    }
+   }
+  },
+  {
+   "id": "crane",
+   "type": "crane",
+   "size": {
+    "W": "pool_W + 2000",
+    "L": "800",
+    "H": "600"
+   },
+   "place": {
+    "at": {
+     "z": "pool_top + 3000"
+    }
+   }
+  }
+ ],
+ "connections": [
+  {
+   "from": "pool",
+   "to": "pump",
+   "z": "pool_top - 1200",
+   "d": "250",
+   "loop": "cooling",
+   "label": "흡입 (사이펀 방지: 수면 근처)"
+  },
+  {
+   "from": "pump",
+   "to": "hx",
+   "z": "400",
+   "d": "250",
+   "loop": "cooling"
+  },
+  {
+   "from": "hx",
+   "to": "pool",
+   "z": "pool_top - 800",
+   "d": "250",
+   "loop": "cooling",
+   "label": "복귀"
+  }
+ ],
+ "loops": [
+  {
+   "key": "cooling",
+   "name": "저장조 냉각",
+   "path": [
+    "rack",
+    "pump",
+    "hx",
+    "rack"
+   ]
+  }
+ ],
+ "principles": [
+  "랙 위 수심 수 m 이상 (작업자 차폐)",
+  "냉각 흡입관은 수면 근처, 복귀관에 사이펀 차단 → 배관 파단 시 수위 유지",
+  "냉각 계열은 2계열 이상 (단일 고장 대비)",
+  "랙은 바닥에 격자 배치, 미임계 유지를 위해 간격·중성자 흡수재"
+ ],
+ "checks": [
+  {
+   "rel": "inside",
+   "a": "rack",
+   "b": "pool"
+  },
+  {
+   "id": "SFP-001",
+   "expr": "pool_top - rack_top >= water_above",
+   "msg": "랙 위 수심 부족",
+   "severity": "error"
+  },
+  {
+   "id": "SFP-002",
+   "expr": "n_train >= 2",
+   "msg": "냉각 계열 1개 — 단일 고장 취약",
+   "severity": "warning"
+  }
+ ],
+ "style": {}
+}

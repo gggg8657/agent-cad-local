@@ -1,0 +1,314 @@
+{
+ "id": "pwr_loop",
+ "name": "루프형 가압경수로 (대형 상용로 계열)",
+ "kind": "reactor",
+ "aliases": [
+  "루프형",
+  "가압경수로",
+  "PWR",
+  "APR1400",
+  "OPR1000",
+  "상용 원전",
+  "loop PWR",
+  "경수로"
+ ],
+ "summary": "원자로 용기 밖에 루프별 증기발생기·냉각재펌프를 두고 고온관·저온관으로 잇는 가압경수로. 가압기는 한 루프 고온관에 연결.",
+ "coolant": "water_pwr",
+ "source": "공개 교과서 수준 대표값 — 사내 검토 필요",
+ "design": {
+  "power_mwth": {
+   "v": 2800,
+   "label": "열출력",
+   "unit": "MWth",
+   "range": [
+    1000,
+    4500
+   ]
+  },
+  "power_density_mw_m3": {
+   "v": 100,
+   "label": "노심 출력밀도",
+   "unit": "MW/m³",
+   "range": [
+    70,
+    110
+   ]
+  },
+  "core_hd": {
+   "v": 1.1,
+   "label": "노심 H/D",
+   "unit": "-",
+   "range": [
+    0.9,
+    1.4
+   ]
+  },
+  "core_dT": {
+   "v": 35,
+   "label": "노심 ΔT",
+   "unit": "K",
+   "range": [
+    25,
+    40
+   ]
+  },
+  "pipe_v": {
+   "v": 14,
+   "label": "1차 배관 유속",
+   "unit": "m/s",
+   "range": [
+    8,
+    16
+   ]
+  },
+  "n_loop": {
+   "v": 2,
+   "label": "루프(증기발생기) 수",
+   "unit": "개",
+   "range": [
+    2,
+    4
+   ]
+  },
+  "rcp_per_loop": {
+   "v": 2,
+   "label": "루프당 펌프",
+   "unit": "대",
+   "range": [
+    1,
+    2
+   ]
+  },
+  "with_containment": {
+   "v": 1,
+   "label": "격납건물 표시",
+   "unit": "0/1",
+   "range": [
+    0,
+    1
+   ]
+  }
+ },
+ "sizing": {
+  "rpv_D_est": "core_D + 1400",
+  "sg_D": "max(3000, core_D * 1.1)",
+  "sg_H": "max(16000, core_H * 4.5)",
+  "loop_R": "rpv_D_est / 2 + 6000 + sg_D / 2",
+  "leg_d": "max(700, sqrt(4 * Q_vol / n_loop / (pi * pipe_v)) * 1000)",
+  "rcp_D": "max(1800, leg_d * 2.2)",
+  "rcp_H": "rcp_D * 2.2",
+  "prz_D": "max(2000, core_D * 0.6)",
+  "prz_H": "prz_D * 5"
+ },
+ "components": [
+  {
+   "id": "core",
+   "type": "core",
+   "size": {
+    "D": "core_D",
+    "H": "core_H"
+   },
+   "place": {
+    "at": {
+     "z": "0"
+    }
+   }
+  },
+  {
+   "id": "barrel",
+   "type": "core_barrel",
+   "size": {
+    "D": "core_D + 400",
+    "H": "core_H + 2500",
+    "t": "60"
+   },
+   "place": {
+    "at": {
+     "z": "-600"
+    }
+   }
+  },
+  {
+   "id": "rpv",
+   "type": "rpv",
+   "size": {
+    "t": "220"
+   },
+   "place": {
+    "contain": {
+     "ids": [
+      "core",
+      "barrel"
+     ],
+     "pad": "300",
+     "pad_top": "2500",
+     "pad_bot": "1000"
+    }
+   }
+  },
+  {
+   "id": "sg",
+   "type": "steam_generator",
+   "count": "n_loop",
+   "size": {
+    "D": "sg_D",
+    "H": "sg_H"
+   },
+   "place": {
+    "ring": {
+     "r": "loop_R",
+     "z": "core_bot"
+    }
+   }
+  },
+  {
+   "id": "rcp",
+   "type": "pump",
+   "count": "n_loop * rcp_per_loop",
+   "size": {
+    "D": "rcp_D",
+    "H": "rcp_H",
+    "motor_z": "core_bot + rcp_H + 500",
+    "motor_D": "rcp_D"
+   },
+   "place": {
+    "ring": {
+     "r": "loop_R - sg_D / 2 - 1500",
+     "z": "core_bot - 1500",
+     "a0": "35"
+    }
+   }
+  },
+  {
+   "id": "prz",
+   "type": "pressurizer",
+   "size": {
+    "D": "prz_D",
+    "H": "prz_H"
+   },
+   "place": {
+    "beside": {
+     "of": "rpv",
+     "dir": "+y",
+     "gap": "4500",
+     "z": "core_bot + 3000"
+    }
+   }
+  },
+  {
+   "id": "cont",
+   "type": "containment",
+   "count": "with_containment",
+   "size": {
+    "t": "1200"
+   },
+   "place": {
+    "contain": {
+     "ids": [
+      "rpv",
+      "sg",
+      "rcp",
+      "prz"
+     ],
+     "pad": "2500",
+     "pad_top": "3500",
+     "pad_bot": "3000"
+    }
+   },
+   "detail": {
+    "operating_floor": "rpv_top + 800",
+    "floor_hole": "rpv_D + 4000"
+   }
+  }
+ ],
+ "connections": [
+  {
+   "from": "rpv",
+   "to": "sg",
+   "z": "core_top + 800",
+   "d": "leg_d",
+   "loop": "primary",
+   "label": "고온관"
+  },
+  {
+   "from": "rcp",
+   "to": "rpv",
+   "z": "core_top + 300",
+   "d": "leg_d * 0.9",
+   "loop": "primary",
+   "label": "저온관"
+  },
+  {
+   "from": "sg",
+   "to": "rcp",
+   "z": "core_bot - 500",
+   "d": "leg_d",
+   "loop": "primary",
+   "label": "중간관"
+  },
+  {
+   "from": "prz",
+   "to": "rpv",
+   "z": "core_bot + 3000",
+   "d": "300",
+   "loop": "primary",
+   "label": "밀림관"
+  }
+ ],
+ "loops": [
+  {
+   "key": "primary",
+   "name": "1차 냉각재",
+   "path": [
+    "core",
+    "sg",
+    "rcp",
+    "core"
+   ]
+  },
+  {
+   "key": "secondary",
+   "name": "2차",
+   "path": [
+    "sg",
+    "TURBINE"
+   ]
+  }
+ ],
+ "principles": [
+  "루프마다 증기발생기 1기, 냉각재펌프 1~2대. 고온관(용기→SG), 중간관(SG→펌프), 저온관(펌프→용기)",
+  "증기발생기 하단(관판)이 노심보다 높아야 자연순환이 성립",
+  "가압기는 1개, 한 루프 고온관에 밀림관으로 연결",
+  "격납건물이 1차계통 전체를 감싼다"
+ ],
+ "checks": [
+  {
+   "rel": "inside",
+   "a": "core",
+   "b": "rpv"
+  },
+  {
+   "rel": "symmetric",
+   "a": "steam_generator"
+  },
+  {
+   "rel": "above",
+   "a": "steam_generator",
+   "b": "core",
+   "key": "center"
+  },
+  {
+   "id": "PWRL-001",
+   "expr": "n_loop >= 2",
+   "msg": "루프가 2개 미만",
+   "severity": "error"
+  }
+ ],
+ "style": {
+  "lattice": "square",
+  "pitch": 215,
+  "crdm": true,
+  "crdm_len": 3500,
+  "sg_type": "u_tube"
+ }
+}

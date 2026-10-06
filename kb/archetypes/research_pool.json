@@ -1,0 +1,305 @@
+{
+ "id": "research_pool",
+ "name": "개방수조형 연구용 원자로",
+ "kind": "reactor",
+ "aliases": [
+  "연구로",
+  "연구용 원자로",
+  "수조형",
+  "개방수조",
+  "open pool",
+  "HANARO",
+  "하나로",
+  "MTR",
+  "조사시험로"
+ ],
+ "summary": "깊은 수조 바닥에 소형 고출력밀도 노심과 반사체 탱크를 두고, 1차 냉각수를 붕괴 탱크·펌프·열교환기로 순환시키는 연구로.",
+ "coolant": "water_lp",
+ "source": "공개 개요 자료 수준 대표값 — 사내 검토 필요",
+ "design": {
+  "power_mwth": {
+   "v": 20,
+   "label": "열출력",
+   "unit": "MWth",
+   "range": [
+    1,
+    100
+   ]
+  },
+  "power_density_mw_m3": {
+   "v": 150,
+   "label": "노심 출력밀도",
+   "unit": "MW/m³",
+   "range": [
+    50,
+    400
+   ]
+  },
+  "core_hd": {
+   "v": 1.2,
+   "label": "노심 H/D",
+   "unit": "-",
+   "range": [
+    0.8,
+    2.0
+   ]
+  },
+  "core_dT": {
+   "v": 10,
+   "label": "노심 ΔT",
+   "unit": "K",
+   "range": [
+    5,
+    20
+   ]
+  },
+  "pipe_v": {
+   "v": 3,
+   "label": "배관 유속",
+   "unit": "m/s",
+   "range": [
+    1.5,
+    5
+   ]
+  },
+  "water_above": {
+   "v": 9000,
+   "label": "노심 위 수심 (차폐)",
+   "unit": "mm",
+   "range": [
+    6000,
+    12000
+   ]
+  },
+  "n_pump": {
+   "v": 2,
+   "label": "1차 펌프 수",
+   "unit": "대",
+   "range": [
+    1,
+    3
+   ]
+  },
+  "n_hx": {
+   "v": 2,
+   "label": "열교환기 수",
+   "unit": "기",
+   "range": [
+    1,
+    3
+   ]
+  }
+ },
+ "sizing": {
+  "refl_D": "max(1500, core_D * 3.5)",
+  "refl_H": "core_H * 1.6",
+  "pool_D": "max(4000, refl_D + 2500)",
+  "pool_H": "core_H + water_above + 2500",
+  "decay_D": "max(1500, sqrt(Q_vol * 60 / pi) * 1000 * 0.9)",
+  "decay_H": "decay_D * 1.8",
+  "pump_D": "max(500, pipe_d * 2.5)",
+  "pump_H": "pump_D * 1.3",
+  "hx_D": "max(700, core_D * 1.2)",
+  "hx_H": "hx_D * 3"
+ },
+ "components": [
+  {
+   "id": "core",
+   "type": "core",
+   "size": {
+    "D": "core_D",
+    "H": "core_H"
+   },
+   "place": {
+    "at": {
+     "z": "0"
+    }
+   }
+  },
+  {
+   "id": "refl",
+   "type": "reflector",
+   "label": "반사체 탱크 (중수)",
+   "size": {
+    "D": "refl_D",
+    "H": "refl_H",
+    "t": "(refl_D - core_D) / 2 - 50"
+   },
+   "place": {
+    "at": {
+     "z": "-core_H * 0.3"
+    }
+   }
+  },
+  {
+   "id": "chim",
+   "type": "chimney",
+   "size": {
+    "D": "core_D * 0.9",
+    "H": "2500"
+   },
+   "place": {
+    "at": {
+     "z": "core_top"
+    }
+   }
+  },
+  {
+   "id": "pool",
+   "type": "pool",
+   "label": "원자로 수조",
+   "size": {
+    "D": "pool_D",
+    "H": "pool_H",
+    "t": "400"
+   },
+   "place": {
+    "at": {
+     "z": "refl_bot - 1500"
+    }
+   }
+  },
+  {
+   "id": "decay",
+   "type": "tank",
+   "label": "붕괴 탱크",
+   "size": {
+    "D": "decay_D",
+    "H": "decay_H"
+   },
+   "place": {
+    "beside": {
+     "of": "pool",
+     "dir": "+x",
+     "gap": "2000",
+     "z": "pool_bot"
+    }
+   }
+  },
+  {
+   "id": "pump",
+   "type": "pump",
+   "count": "n_pump",
+   "size": {
+    "D": "pump_D",
+    "H": "pump_H",
+    "motor_z": "pool_bot + pump_H + 200",
+    "motor_D": "pump_D"
+   },
+   "place": {
+    "line": {
+     "pitch": "pump_D * 2.5",
+     "z": "pool_bot",
+     "dir": "y",
+     "cx": "decay_x + decay_D / 2 + 1500 + pump_D",
+     "cy": "0"
+    }
+   }
+  },
+  {
+   "id": "hx",
+   "type": "heat_exchanger",
+   "count": "n_hx",
+   "size": {
+    "D": "hx_D",
+    "H": "hx_H"
+   },
+   "place": {
+    "line": {
+     "pitch": "hx_D * 2",
+     "z": "pool_bot",
+     "dir": "y",
+     "cx": "pump_x + pump_D + 1500 + hx_D / 2",
+     "cy": "0"
+    }
+   }
+  }
+ ],
+ "connections": [
+  {
+   "from": "pool",
+   "to": "decay",
+   "z": "pool_bot + 600",
+   "d": "pipe_d",
+   "loop": "primary",
+   "label": "1차 출구 (하향류)"
+  },
+  {
+   "from": "decay",
+   "to": "pump",
+   "z": "pool_bot + 400",
+   "d": "pipe_d",
+   "loop": "primary"
+  },
+  {
+   "from": "pump",
+   "to": "hx",
+   "z": "pool_bot + 400",
+   "d": "pipe_d",
+   "loop": "primary"
+  },
+  {
+   "from": "hx",
+   "to": "pool",
+   "z": "pool_top - 1500",
+   "d": "pipe_d",
+   "loop": "primary",
+   "label": "1차 복귀"
+  }
+ ],
+ "loops": [
+  {
+   "key": "primary",
+   "name": "1차 냉각수",
+   "path": [
+    "core",
+    "decay",
+    "pump",
+    "hx",
+    "core"
+   ]
+  },
+  {
+   "key": "secondary",
+   "name": "2차 냉각수 (냉각탑)",
+   "path": [
+    "hx",
+    "COOLING_TOWER"
+   ]
+  }
+ ],
+ "principles": [
+  "노심 위 수심 수 m 이상으로 방사선 차폐 (수조 상부 작업 가능)",
+  "하향류 냉각 시 노심 출구수를 붕괴 탱크에 체류시켜 N-16 을 감쇠한 뒤 펌프로",
+  "반사체 탱크(중수/흑연)가 노심을 둘러싸며 조사공·빔포트를 수용",
+  "1차 펌프·열교환기는 수조 밖 별도 실, 수조 수위보다 낮은 배관 관통부 최소화(사이펀 방지)"
+ ],
+ "checks": [
+  {
+   "rel": "inside",
+   "a": "core",
+   "b": "pool"
+  },
+  {
+   "rel": "inside",
+   "a": "reflector",
+   "b": "pool"
+  },
+  {
+   "rel": "coaxial",
+   "a": "reflector",
+   "b": "core"
+  },
+  {
+   "id": "RR-001",
+   "expr": "pool_top - core_top >= water_above",
+   "msg": "노심 위 수심 부족 (차폐)",
+   "severity": "error"
+  }
+ ],
+ "style": {
+  "lattice": "hex",
+  "pitch": 80,
+  "refl_mat": "water"
+ }
+}

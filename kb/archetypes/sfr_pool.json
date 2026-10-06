@@ -1,0 +1,271 @@
+{
+ "id": "sfr_pool",
+ "name": "풀형 소듐냉각고속로 (SFR)",
+ "kind": "reactor",
+ "aliases": [
+  "SFR",
+  "소듐냉각고속로",
+  "소듐",
+  "고속로",
+  "풀형",
+  "pool-type",
+  "PGSFR",
+  "KALIMER",
+  "액체금속로"
+ ],
+ "summary": "노심·중간열교환기(IHX)·1차 펌프를 액체 소듐 풀(주 용기)에 잠기게 하고, 주 용기 밖을 보호 용기로 감싼 고속로.",
+ "coolant": "sodium",
+ "source": "공개 개요 자료 수준 대표값 — 사내 검토 필요",
+ "design": {
+  "power_mwth": {
+   "v": 500,
+   "label": "열출력",
+   "unit": "MWth",
+   "range": [
+    50,
+    3000
+   ]
+  },
+  "power_density_mw_m3": {
+   "v": 250,
+   "label": "노심 출력밀도",
+   "unit": "MW/m³",
+   "range": [
+    150,
+    400
+   ]
+  },
+  "core_hd": {
+   "v": 0.45,
+   "label": "노심 H/D (납작한 노심)",
+   "unit": "-",
+   "range": [
+    0.3,
+    0.8
+   ]
+  },
+  "core_dT": {
+   "v": 150,
+   "label": "노심 ΔT",
+   "unit": "K",
+   "range": [
+    100,
+    200
+   ]
+  },
+  "pipe_v": {
+   "v": 6,
+   "label": "배관 유속",
+   "unit": "m/s",
+   "range": [
+    3,
+    8
+   ]
+  },
+  "n_ihx": {
+   "v": 4,
+   "label": "중간열교환기 수",
+   "unit": "기",
+   "range": [
+    2,
+    8
+   ]
+  },
+  "n_pump": {
+   "v": 2,
+   "label": "1차 펌프 수",
+   "unit": "대",
+   "range": [
+    1,
+    4
+   ]
+  }
+ },
+ "sizing": {
+  "ihx_D": "max(1200, core_D * 0.35)",
+  "ihx_H": "max(6000, core_H * 5)",
+  "pump_D": "max(1000, pipe_d * 2.5)",
+  "pump_H": "ihx_H * 0.75",
+  "ring_R": "core_D / 2 + 900 + ihx_D / 2"
+ },
+ "components": [
+  {
+   "id": "core",
+   "type": "core",
+   "size": {
+    "D": "core_D",
+    "H": "core_H"
+   },
+   "place": {
+    "at": {
+     "z": "0"
+    }
+   }
+  },
+  {
+   "id": "ihx",
+   "type": "ihx",
+   "count": "n_ihx",
+   "size": {
+    "D": "ihx_D",
+    "H": "ihx_H"
+   },
+   "place": {
+    "ring": {
+     "r": "ring_R",
+     "z": "core_top + 1000"
+    }
+   }
+  },
+  {
+   "id": "vessel",
+   "type": "rpv",
+   "label": "주 용기 (소듐 풀)",
+   "size": {
+    "t": "50"
+   },
+   "place": {
+    "contain": {
+     "ids": [
+      "core",
+      "ihx"
+     ],
+     "pad": "700",
+     "pad_top": "1200",
+     "pad_bot": "2500"
+    }
+   },
+   "detail": {
+    "flange": false,
+    "skirt": false
+   }
+  },
+  {
+   "id": "guard",
+   "type": "guard_vessel",
+   "size": {
+    "t": "30"
+   },
+   "place": {
+    "contain": {
+     "ids": [
+      "vessel"
+     ],
+     "pad": "400",
+     "pad_top": "0",
+     "pad_bot": "400"
+    }
+   },
+   "detail": {
+    "flange": false,
+    "skirt": false
+   }
+  },
+  {
+   "id": "roof",
+   "type": "roof_deck",
+   "size": {
+    "D": "guard_D + 1200",
+    "H": "1200"
+   },
+   "place": {
+    "at": {
+     "z": "vessel_top"
+    }
+   }
+  },
+  {
+   "id": "pump",
+   "type": "pump",
+   "count": "n_pump",
+   "size": {
+    "D": "pump_D",
+    "H": "pump_H",
+    "motor_z": "roof_top + 300",
+    "motor_D": "pump_D * 1.3"
+   },
+   "place": {
+    "ring": {
+     "r": "ring_R",
+     "z": "core_top + 600",
+     "a0": "180 / n_ihx"
+    }
+   }
+  }
+ ],
+ "connections": [
+  {
+   "from": "ihx",
+   "to": "outside",
+   "z": "roof_top + 600",
+   "d": "max(300, pipe_d * 0.6)",
+   "loop": "intermediate",
+   "vertical_exit": true
+  }
+ ],
+ "loops": [
+  {
+   "key": "primary",
+   "name": "1차 소듐 (풀 내부)",
+   "path": [
+    "core",
+    "ihx",
+    "pump",
+    "core"
+   ]
+  },
+  {
+   "key": "intermediate",
+   "name": "중간 소듐 루프",
+   "path": [
+    "ihx",
+    "SG(외부)"
+   ]
+  }
+ ],
+ "principles": [
+  "풀형: 1차 소듐 계통 전체가 주 용기 안 → 1차 소듐 누설 경로 최소화",
+  "중간열교환기와 1차 펌프는 상부 덮개(roof deck)에 매달려 노심 둘레에 원주 배치 (교대 배치)",
+  "주 용기 밖을 보호 용기가 감싼다 (주 용기 누설 시에도 노심 냉각 수위 유지)",
+  "중간 소듐 루프를 두어 방사화된 1차 소듐과 물·증기 계통을 분리",
+  "노심은 납작(H/D 작음)하고 출력밀도가 높다"
+ ],
+ "checks": [
+  {
+   "rel": "inside",
+   "a": "core",
+   "b": "rpv"
+  },
+  {
+   "rel": "inside",
+   "a": "ihx",
+   "b": "rpv"
+  },
+  {
+   "rel": "above",
+   "a": "ihx",
+   "b": "core"
+  },
+  {
+   "rel": "symmetric",
+   "a": "ihx"
+  },
+  {
+   "rel": "inside",
+   "a": "rpv",
+   "b": "guard_vessel"
+  },
+  {
+   "id": "SFR-001",
+   "expr": "n_ihx % n_pump == 0",
+   "msg": "IHX 수가 펌프 수의 배수가 아님",
+   "severity": "warning"
+  }
+ ],
+ "style": {
+  "lattice": "hex",
+  "pitch": 160,
+  "crdm": false,
+  "ihx_riser": 2500
+ }
+}

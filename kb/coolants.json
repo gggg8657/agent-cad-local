@@ -1,0 +1,10 @@
+{
+ "note": "운전 조건 대표 물성 (교과서 수준 근사). 사내 물성 DB 로 교체 가능.",
+ "water_pwr":  {"label": "경수 (가압, ~15.5 MPa, ~300°C)", "rho": 720, "cp": 5500},
+ "water_lp":   {"label": "경수 (저압 수조, ~40°C)",        "rho": 992, "cp": 4180},
+ "sodium":     {"label": "액체 소듐 (~450°C)",            "rho": 845, "cp": 1270},
+ "helium":     {"label": "헬륨 (~7 MPa, ~550°C)",          "rho": 4.0, "cp": 5193},
+ "FLiBe":      {"label": "LiF-BeF2 (FLiBe)",              "rho": 1940, "cp": 2386},
+ "lead":       {"label": "납 (~450°C)",                    "rho": 10500, "cp": 147},
+ "none":       {"label": "해당 없음 (시설)",                 "rho": 1, "cp": 1}
+}
