@@ -1,8 +1,16 @@
 # agent-cad-local — 폐쇄망 로컬 CAD Agent (말하면 IR, 엔진이 그린다)
 
-> **한 줄 요약** — 로컬 LLM은 **Project IR(JSON)만** 쓰고, 기하는 결정론적 엔진(OpenCascade/build123d · ezdxf · 자체 배치·결선 엔진)이 만든다.
-> 한 IR에서 STEP·STL·GLB·DXF·SVG·CSV·검증 보고서가 함께 나오고, 규칙 위반은 LLM 수리 루프(최대 3회)로 되돌린다.
-> 근거 설계: `local_unified_cad_agent_architecture.md` · 이번 구현 범위와 완료 기준: `GOAL.md`
+로컬 LLM은 좌표나 CAD 코드를 쓰지 않고 **Project IR(JSON)만** 씁니다. 형상은 결정론적 엔진(OpenCascade/build123d · ezdxf · 자체 배치·결선 엔진)이 만들고, 한 IR에서 STEP·STL·GLB·DXF·SVG·CSV·검증 보고서가 함께 나옵니다. 규칙 위반은 LLM 수리 루프(최대 3회)로 되돌립니다.
+
+![3D 부품 화면 — ① 3D 탭 ② 리비전 선택 ③ 대화와 결과 이력](docs/img/cad-part3d.png)
+
+근거 설계: `local_unified_cad_agent_architecture.md` · 구현 범위와 완료 기준: `GOAL.md`
+
+## 무엇을 하나
+
+3D 부품 · 2D 판재 · ICT 배치도 · 기존 DXF 수정 · DXF 분석 · 원자로·원자력 설비, 6가지 작업을 한 화면에서 합니다. 모든 산출물에는 `DRAFT — NOT FOR CONSTRUCTION` 을 표기합니다.
+
+### 작업별 입력·산출물
 
 | 작업 | 입력 예 | 산출물 |
 |---|---|---|
@@ -12,6 +20,60 @@
 | **기존 DXF 수정** `dxf_edit` | DXF + "승강장에 AP 4개 추가, CAM-06 삭제" | `<원본>_rev_A.dxf`(원본 보존) · 연산 로그 · 변경 diff · 하이라이트 미리보기 |
 | **DXF 분석** `dxf_analyze` | DXF + "무슨 도면이야? 레이어 문제는?" | Semantic Index · 답변 · 레이어 표준 위반 |
 | **원자로·원자력 설비** `assembly` (지식 DB 8종 + custom) | "SMART형 PWR 330 MWth", "풀형 SFR", "핫셀 3칸" (+선택: 개념도 이미지) | STEP 조립체 · 절개 GLB · GA 단면도 DXF · 계통도 DXF · 기기표 CSV · 사이징 · 시각 자기검증 · **GT 점수** |
+
+## 사용 방법
+
+번호는 맨 위 3D 부품 화면의 상자 번호입니다.
+
+1. **작업을 고르거나 '자동 분류'로 둔다** — 3D 부품 · 2D 판재 · ICT 배치도 · DXF 수정 · DXF 분석 · 원자로·원자력 설비. 자동이면 키워드로 나누고, 애매할 때만 LLM이 고릅니다. 왼쪽 예시 버튼으로 시작해도 됩니다.
+2. **치수·수량을 말로 쓰고 실행한다** — DXF나 그림(PNG·JPG)을 첨부하면 함께 읽습니다(명령이 우선). 진행 로그에 LLM 작성 → 빌드 → 규칙 검증 → 수리 과정이 실시간으로 나오고, 결과는 오른쪽 탭(도면 · ①3D · IR · 검증 보고서 · 파일 · 지식 DB)에서 봅니다. 3D는 드래그 회전 · 휠 확대 · 우클릭 이동.
+3. **같은 칸에 후속 지시를 쓰거나 IR을 직접 고친다** — "벽두께 2.5로"처럼 쓰면 새 리비전(R01…)이 ③ 이력에 쌓이고, ② 리비전 선택으로 각 리비전의 모델·IR·보고서·파일을 불러옵니다. IR 탭에서 값을 고치면 LLM 없이 다시 빌드합니다.
+
+## 예시
+
+모두 gemma4:31b 로 실제 실행한 결과입니다.
+
+### 3D 부품 — 자연어 생성 → 후속 지시 → IR 직접 수정 (맨 위 화면)
+
+- **입력 R00**: `ABS 케이스. 외형 100x70x30 mm, 벽두께 2 mm, 윗면 개방, 세로 모서리 R4. 다른 구멍은 없음.` → 후속 입력 `벽두께 2.5로`
+- **출력**: `abs_case.step` · `.stl` · `.glb` · `abs_case_drawing.dxf` · `ir.json` · `report.md`
+
+| 리비전 | 실제 변경 | 질량 | 검증 |
+|---|---|---|---|
+| R00 | 자연어 생성 · 벽두께 2 mm | 33.6 g | PASS |
+| R01 | 후속 지시 · 벽두께 2.5 mm | 41.4 g | PASS |
+| R02 | IR 직접 수정 · 벽두께 3 mm | 49.1 g | PASS |
+
+### 2D 판재 — 가공도 DXF와 레이저 cut DXF
+
+![2D 판재 — ① 결과 탭 ② 도면 팬·줌](docs/img/cad-part2d.png)
+
+- **입력**: `200 x 100 판재, 두께 3 SUS304. 모서리 R10. M6 볼트 구멍 네 개 (모서리에서 12). 중앙에 40x20 사각 구멍 R3`
+- **출력(통과)**: `plate_200x100_m6.dxf`(치수·중심선·표제란) · `plate_200x100_m6_cut.dxf`(외곽·구멍만, 레이저/워터젯용) · `ir.json` · `report.md` — 외형 200 × 100 mm, M6 여유 구멍(Ø6.6) 4개, 총 절단 길이 780.6 mm, 계산 질량 451.6 g
+
+### ICT 배치도 — 배치·결선·케이블 자동 산정
+
+![ICT — ① 도면 서브탭 ② 배치도 캔버스 ③ 장비 ID 툴팁 ④ 결과 탭](docs/img/cad-ict.png)
+
+- **입력**: `지하철역 B2 승강장 ICT 배치도 초안 작성. CCTV 12대, AP 4대, 비상통화장치 4대. 통신실은 B1이고 Access SW 2대를 통해 Core SW 이중화.`
+- **출력**: 배치도·개황도(계통도)·랙 실장도 DXF 3종, 장비·케이블·BOM CSV 3종, 3D 목업 GLB, `model.json` · `ir.json` · `report.md` — 장비 33대, 19인치 랙(42U) 3개, 결선 27개, 총 케이블 1,227 m. 규칙 ICT-001~011로 검증(이 실행은 경고 1 · 수리 1회).
+
+### 기존 DXF 수정 — 원본 보존 Save-As
+
+![DXF 수정 — ① 도면 하이라이트 ② 결과 탭·리비전 ③ 실행 이력 배지 ④ 원본 DXF 첨부](docs/img/cad-dxf-edit.png)
+
+- **입력**: `station_B2.dxf` 첨부 + `승강장에 AP 4개 추가하고, CAM-06 은 삭제, CAM-03 은 역무실로 이동`
+- **LLM이 만든 연산**: `add_equipment(ap ×4, 승강장)` · `delete(CAM-06)` · `move(CAM-03 → 역무실)` — 적용 3/3
+- **출력**: `station_B2_rev_A.dxf`(원본은 그대로) · `ops.json` · `report.md`(diff) — AP-01~04 추가, CAM-06 삭제, CAM-03 이동, 변경 위치에 리비전 델타(Δ) 표시
+
+### 원자로·원자력 설비 — 지식 DB 원형으로 SMART형 PWR
+
+![원자로·원자력 설비 — ① GA/계통도 서브탭 ② GA 단면도](docs/img/cad-assembly.png)
+
+- **입력**: `SMART 같은 일체형 가압경수로 단면도. 열출력 330 MWth, 증기발생기 8기`
+- **출력(pass)**: 원형 `pwr_integral`, 기기 16개 — `.step` · 절개 `.glb` · GA·계통도 `.dxf` · 기기표 `.csv` · `model.json` · `report.md`
+
+## 설치·실행
 
 ```bash
 bash setup.sh                    # venv(build123d·ezdxf·shapely) → LLM 탐색 → selftest → http://localhost:8778
@@ -24,7 +86,10 @@ venv/bin/python selftest.py      # LLM 없이 5개 작업 + 수리 루프 + 재�
 
 | 환경변수 | 기본 | 설명 |
 |---|---|---|
-| `LLM_API` / `LLM_BASE_URL` / `LLM_MODEL` | `ollama` / `:11434` / `qwen3:8b` | 30B 급 권장 (gemma4:31b 실측) |
+| `LLM_API` / `LLM_BASE_URL` / `LLM_MODEL` | `ollama` / `:11434` / `qwen3:8b` | 30B 급 권장. 포털로 띄우면 로컬 Ollama `gemma4:31b` (실측 모델) |
+| `VISION_MODEL` | (`LLM_MODEL` 과 같음) | 그림 판독용 VLM |
+| `LLM_API_KEY` | (없음) | OpenAI 호환 서버 키 |
+| `NUM_CTX` | `32768` | Ollama 컨텍스트 |
 | `PORT` | `8778` | |
 | `WORKSPACE` | `./_workspace` | 프로젝트·리비전 저장 (포털은 `_data/agent-cad-local`) |
 | `MAX_REPAIR` | `3` | 수리 루프 최대 횟수 |
@@ -124,3 +189,7 @@ VLM 스캔도면 인식 · DWG(ODA 변환) · 어셈블리 구속 · GD&T · 벽
 - 이 도구는 [agent-page-portal](https://github.com/gggg8657/agent-page-portal) 에 연결해 쓰도록 만들었습니다(단독 실행도 됨).
 
 저작권 표기·전체 목록은 `NOTICE` 를 보세요.
+
+## 라이선스
+
+MIT License — Copyright (c) 2026 gggg8657 (DongJu Kim). `LICENSE` 참고.
