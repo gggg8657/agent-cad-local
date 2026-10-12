@@ -18,10 +18,21 @@ from cad import llm, pipeline
 from cad.util import ROOT, read, resource
 
 PORT = int(os.environ.get("PORT", "8778"))
+WS = pipeline.WS
 STATIC = {"three.min.js", "GLTFLoader.js", "OrbitControls.js"}  # fonts/ 는 서버 내부(래스터)용
 CTYPE = {".svg": "image/svg+xml", ".dxf": "application/dxf", ".step": "application/step", ".stl": "model/stl", ".glb": "model/gltf-binary",
          ".csv": "text/csv; charset=utf-8", ".md": "text/markdown; charset=utf-8", ".json": "application/json; charset=utf-8",
          ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+
+
+def user_ws(h):
+    """포털이 넘긴 사용자별 작업 폴더. owner(서버 주인)·헤더 없음(단독 실행) = 예전 WORKSPACE 그대로"""
+    u = (h.headers.get("X-Agent-User") or "owner").strip()
+    if u == "owner":
+        return WS
+    d = os.path.join(WS, "u", re.sub(r"[^A-Za-z0-9_.-]", "_", u)[:64] or "_")
+    os.makedirs(d, exist_ok=True)
+    return d
 
 
 class H(BaseHTTPRequestHandler):
@@ -42,6 +53,7 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(b)
 
     def do_GET(self):
+        pipeline.use_ws(user_ws(self))  # 프로젝트·업로드는 사용자별 (같은 연결의 다음 요청도 여기서 다시 정함)
         u = urllib.parse.urlparse(self.path)
         path = u.path
         try:
@@ -121,6 +133,7 @@ class H(BaseHTTPRequestHandler):
             emit({"error": f"{type(e).__name__}: {e}"})
 
     def do_POST(self):
+        pipeline.use_ws(user_ws(self))
         n = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(n)
         try:
@@ -165,4 +178,4 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--cli":
         sys.exit(cli(sys.argv[2] if len(sys.argv) > 2 else sys.stdin.read(), sys.argv[3] if len(sys.argv) > 3 else "auto"))
     print(f"agent-cad-local → http://localhost:{PORT}  (model={llm.MODEL}, llm={llm.LLM_API} {llm.LLM_BASE}, data={pipeline.WS})")
-    ThreadingHTTPServer(("", PORT), H).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", ""), PORT), H).serve_forever()

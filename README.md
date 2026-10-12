@@ -92,7 +92,10 @@ venv/bin/python selftest.py      # LLM 없이 5개 작업 + 수리 루프 + 재�
 | `NUM_CTX` | `32768` | Ollama 컨텍스트 |
 | `PORT` | `8778` | |
 | `WORKSPACE` | `./_workspace` | 프로젝트·리비전 저장 (포털은 `_data/agent-cad-local`) |
+| `BIND` | (모든 인터페이스) | 듣는 주소. 포털은 `127.0.0.1` 로 띄워 포털을 거쳐서만 접근 |
 | `MAX_REPAIR` | `3` | 수리 루프 최대 횟수 |
+
+프로젝트·업로드는 사용자별로 따로 저장합니다(포털 접속자 기준, 포털이 넘기는 `X-Agent-User` 헤더 → `$WORKSPACE/u/<사용자>/projects`·`uploads`). 서버 주인(헤더 없음·`owner`)은 `$WORKSPACE` 그대로라 예전 기록도 보입니다. 지식 DB 수정본(`kb_overrides`)은 팀이 함께 쓰는 기준이라 **공유됨**.
 
 ## 구조
 

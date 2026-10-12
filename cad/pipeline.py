@@ -13,14 +13,28 @@ import os
 import re
 import secrets
 import shutil
+import threading
 import time
 
 from . import assembly, assembly_draw, dxfedit, dxfkit, ict, ict_draw, kb, llm, part2d, part3d, plant, svg
 from .util import ROOT, dump_json, extract_json, load_json, read, resource, write
 
 WS = os.environ.get("WORKSPACE") or os.path.join(ROOT, "_workspace")
-PROJ = os.path.join(WS, "projects")
-UPLOAD = os.path.join(WS, "uploads")
+_TL = threading.local()  # 요청 스레드별 사용자 작업 폴더 (app.user_ws → use_ws). 없으면 WS
+
+
+def use_ws(d):
+    _TL.ws = d
+
+
+def _proj():
+    return os.path.join(getattr(_TL, "ws", None) or WS, "projects")
+
+
+def _upload():
+    return os.path.join(getattr(_TL, "ws", None) or WS, "uploads")
+
+
 MAX_REPAIR = int(os.environ.get("MAX_REPAIR", "3"))
 TASKS = ("part3d", "part2d", "ict", "dxf_edit", "dxf_analyze", "assembly")
 TASK_LABEL = {"part3d": "3D 부품", "part2d": "2D 판재", "ict": "ICT 배치도·개황도", "dxf_edit": "기존 DXF 수정", "dxf_analyze": "DXF 분석",
@@ -84,7 +98,7 @@ def route(text, has_dxf, model=None, emit=None, has_img=False, img=None):
 def pdir(pid):
     if not re.fullmatch(r"[0-9]{8}-[0-9a-f]{6}", pid or ""):
         raise ValueError("잘못된 프로젝트 id")
-    return os.path.join(PROJ, pid)
+    return os.path.join(_proj(), pid)
 
 
 def load(pid):
@@ -97,7 +111,7 @@ def save(p):
 
 def new_project(task, title, owner=None):
     pid = datetime.date.today().strftime("%Y%m%d") + "-" + secrets.token_hex(3)
-    os.makedirs(os.path.join(PROJ, pid, "input"), exist_ok=True)
+    os.makedirs(os.path.join(_proj(), pid, "input"), exist_ok=True)
     p = {"id": pid, "task": task, "title": title[:60], "created": datetime.datetime.now().isoformat(timespec="seconds"),
          "messages": [], "revisions": [], "input": None, "owner": owner}
     save(p)
@@ -106,10 +120,10 @@ def new_project(task, title, owner=None):
 
 def list_projects(limit=80, owner=None, show_all=False):
     """숨김 제외. owner(브라우저 id)를 주면 그 사람이 만든 것만 (show_all 이면 모두)."""
-    if not os.path.isdir(PROJ):
+    if not os.path.isdir(_proj()):
         return []
     out = []
-    for pid in sorted(os.listdir(PROJ), reverse=True):
+    for pid in sorted(os.listdir(_proj()), reverse=True):
         if len(out) >= limit:
             break
         try:
@@ -132,14 +146,14 @@ def set_hidden(pid, hidden=True):
 
 
 def save_upload(name, data):
-    os.makedirs(UPLOAD, exist_ok=True)
+    os.makedirs(_upload(), exist_ok=True)
     if not name.lower().endswith((".dxf",) + IMG_EXT):
         raise ValueError("DXF 또는 이미지(PNG/JPG)만 (DWG는 ODA File Converter로 DXF 변환 후)")
     if len(data) > 200 << 20:
         raise ValueError("200 MB 초과")
     uid = secrets.token_hex(6)
     safe = re.sub(r"[^\w.\-가-힣]", "_", os.path.basename(name))[:80]
-    path = os.path.join(UPLOAD, f"{uid}__{safe}")
+    path = os.path.join(_upload(), f"{uid}__{safe}")
     with open(path, "wb") as f:
         f.write(data)
     return uid
@@ -148,9 +162,9 @@ def save_upload(name, data):
 def upload_path(uid):
     if not re.fullmatch(r"[0-9a-f]{12}", uid or ""):
         raise ValueError("잘못된 업로드 id")
-    for n in os.listdir(UPLOAD):
+    for n in os.listdir(_upload()):
         if n.startswith(uid + "__"):
-            return os.path.join(UPLOAD, n)
+            return os.path.join(_upload(), n)
     raise FileNotFoundError(uid)
 
 
