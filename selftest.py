@@ -149,6 +149,46 @@ try:
        and all(os.path.exists(os.path.join(d, f)) for f in ("part_render.png", "visual_compare.json", "attempt_visual.json")),
        f"시각 비교 일치 30 → 시각 수리 → 85 채택, 결과 렌더 저장 ({r.get('visual_repair')})")
 
+    # 정의 안 된 치수 이름 → 0 으로 조용히 바꾸지 않고 오류 → 수리
+    slot = {"kind": "part3d", "name": "slot", "material": "AL6061", "params": {"W": 60}, "base": {"type": "box", "size": ["W", 40, 20]},
+            "features": [{"op": "pocket", "face": "top", "shape": "slot", "l": 30, "w": "slot_w", "at": [0, 0], "depth": 5}]}
+    QUEUE[:] = [slot, dict(slot, params={"W": 60, "slot_w": 8})]
+    p = pipeline.run("장공 블록", "part3d", emit=emit)
+    r = p["revisions"][-1]
+    ok(r["attempts"] == 2 and r["status"] == "pass" and "치수 이름 'slot_w' 이 정의되지 않음" in SEEN[-1][1][0]["content"],
+       f"정의 안 된 이름 slot_w → 오류 문구로 수리 → pass ({r['status']})")
+    # 필렛: 대상 모서리 없음/커널 실패 → 줄여 재시도 → 건너뛰고 경고 (빌드는 성공)
+    QUEUE[:] = [{"kind": "part3d", "name": "disc", "base": {"type": "cylinder", "d": 80, "h": 20},
+                 "features": [{"op": "hole", "face": "top", "d": 10, "at": [[0, 0]]}, {"op": "fillet", "edges": "vertical", "r": 2}]}]
+    p = pipeline.run("원판", "part3d", emit=emit)
+    r = p["revisions"][-1]
+    ok(r["attempts"] == 1 and r["status"] == "warnings" and any(c["id"] == "P3D-008" for c in r["checks"]),
+       f"원통 vertical 필렛 실패 → 건너뜀 경고, 빌드 성공 ({r['status']})")
+    # 워커 보호: 삼각 프리즘 + 단면 밖까지 나간 포켓 + 필렛 = OCC segfault → fork 자식만 죽고 워커는 결과를 낸다
+    from cad import part3d
+    crash = {"kind": "part3d", "name": "crash", "base": {"type": "extrude", "plane": "XY", "points": [[0, 0], [150, 0], [0, 320]], "h": 20},
+             "features": [{"op": "pocket", "face": "top", "shape": "rect", "w": 130, "h": 300, "at": [10, 10], "depth": 21},
+                          {"op": "fillet", "edges": "vertical", "r": 3}]}
+    res = part3d.build(part3d.normalize(crash)[0], os.path.join(WS, "crash"), util.resource("rules", "part.json"))
+    ok(not res.get("error") and any(c["id"] == "P3D-008" for c in res["checks"]), "커널 segfault(필렛) → 워커 생존, 필렛만 건너뜀")
+    # 새 형상 어휘: 꼭짓점 라운드 + 내부 루프, 속 빈 단면(wall), 경사 절단
+    import math
+    for ir, want_bbox, want_vol, lab in (
+            ({"kind": "part3d", "name": "plate", "params": {"L": 120, "D": 60, "T": 8},
+              "base": {"type": "extrude", "plane": "XY", "points": [["-L/2", "-D/2", 10], ["L/2", "-D/2", 10], ["L/2", "D/2", 10], ["-L/2", "D/2", 10]], "h": "T",
+                       "holes": [[[-20, -10, 3], [20, -10, 3], [20, 10, 3], [-20, 10, 3]], {"type": "circle", "at": [40, 0], "d": 10}]}},
+             [120, 60, 8], (120 * 60 - (4 - math.pi) * 100 - (800 - (4 - math.pi) * 9) - math.pi * 25) * 8, "꼭짓점 R10 + 내부 루프(R3 창·원)"),
+            ({"kind": "part3d", "name": "rack", "base": {"type": "extrude", "plane": "XY", "points": [[0, 0], [100, 0], [100, 60], [0, 60]], "wall": 5, "h": 10}},
+             [100, 60, 10], (100 * 60 - 90 * 50) * 10, "wall 5 속 빈 단면 (사각 프레임)"),
+            ({"kind": "part3d", "name": "sliced", "base": {"type": "cylinder", "d": 40, "h": 80},
+              "features": [{"op": "cut", "shape": "plane", "point": [0, 0, 80 - 20 * math.tan(math.radians(30))], "axis": "y", "angle": 30}]},
+             [40, 40, 80], math.pi * 400 * (80 - 20 * math.tan(math.radians(30))), "경사 절단 (axis y, 30°)")):
+        QUEUE[:] = [ir]
+        p = pipeline.run(lab, "part3d", emit=emit)
+        r = p["revisions"][-1]
+        ok(r["status"] == "pass" and r["metrics"]["bbox_mm"] == want_bbox and abs(r["metrics"]["volume_mm3"] - want_vol) < 0.5,
+           f"{lab}: 외형 {r['metrics'].get('bbox_mm')}, 부피 {r['metrics'].get('volume_mm3')} ≈ {want_vol:.1f}")
+
     # 3) ICT — 엔진 자동 산정(분기실·스위치·NVR) + 규칙
     print("[ICT 배치도·개황도]")
     ir = {"kind": "ict", "name": "OO역 ICT", "floors": [

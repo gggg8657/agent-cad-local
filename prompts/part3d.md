@@ -19,6 +19,10 @@
    {"type":"tube","d":외경,"id":내경,"h":H}                           // 링·파이프·와셔 (id 에도 params 이름 사용 가능)
    {"type":"extrude","plane":"XZ","points":[[x,z],...],"h":Y방향두께}   // L/T/U자 단면. XZ 단면은 Y로 양쪽 대칭 돌출. XY 단면은 Z=0부터 위로
    {"type":"revolve","plane":"XZ","points":[[r,z],...]}                // Z축 회전체 (r≥0)
+   extrude·revolve 단면 옵션:
+     "points":[[x,y],[x,y,R],...]   // 세 번째 값 R = 그 꼭짓점 라운드 반경 (0/생략 = 각진 모서리). "r":R 은 모든 꼭짓점
+     "holes":[[[x,y],...], {"type":"circle","at":[x,y],"d":D}]   // 단면 안쪽 구멍(내부 루프) — 같은 평면 좌표
+     "wall":t                       // 외곽을 안쪽으로 t 만큼 띄운 속 빈 단면 (각관·프레임·삼각 랙)
  "features": [ 순서대로 적용
    {"op":"hole","face":"top","d":6.6,"at":[[u,v],...]}                        // 관통
    {"op":"hole","face":"top","thread":"M6","pattern":"corners","inset":10}  // 볼트 여유구멍, 모서리에서 10mm
@@ -29,6 +33,8 @@
    {"op":"pocket","face":"top","shape":"rect|circle|slot","w":..,"h":..,"r":..,"d":..,"l":..,"at":[u,v],"depth":..}
    {"op":"boss","face":"top","shape":"circle","d":20,"at":[u,v],"height":5}
    {"op":"add"|"cut","shape":"box","size":[x,y,z],"at":[x,y,z]}   // 절대좌표 중심. cylinder 는 "d","h","axis":"x|y|z"
+   {"op":"cut","shape":"plane","point":[x,y,z],"normal":[nx,ny,nz]}  // 경사 절단: point 를 지나는 평면의 normal 쪽을 잘라냄
+   {"op":"cut","shape":"plane","point":[x,y,z],"axis":"x|y","angle":30} // 위 방향(+Z) 평면을 axis 둘레로 angle° 기울인 것
    {"op":"shell","face":"top","t":2}                              // 해당 면을 열고 속을 비움 (케이스)
    {"op":"fillet","edges":"vertical|top|bottom|all|x|y","r":3}
    {"op":"chamfer","edges":"...","d":1}
@@ -46,7 +52,9 @@
 - 벽을 뚫는 창·커넥터 구멍은 face 기반 pocket 으로, depth 는 벽두께 파라미터 참조 "T+1" (숫자 X). 그래야 두께를 바꿔도 관통이 유지된다.
   예) {"op":"pocket","face":"right","shape":"rect","w":12,"h":6,"at":[0,"H/2"],"depth":"T+1"}
 - 치수끼리 연관되면 숫자 대신 params 이름·수식을 쓴다.
-- fillet edges "all" 은 느리고 실패가 잦다. 필요한 모서리 집합만.
+- fillet edges "all" 은 느리고 실패가 잦다. 필요한 모서리 집합만. 요청·그림에 라운드가 없으면 fillet 을 넣지 않는다 (원통에는 vertical 모서리가 없다).
+- 수식에 쓰는 이름은 **모두 params 에 먼저 정의**한다. 정의 안 된 이름은 오류다.
+- 단면의 둥근 모서리는 points 의 R (3번째 값), 속 빈 단면·관통 창은 holes/wall, 비스듬히 잘린 면은 cut plane 으로.
 
 ## 예시
 요청: 100x60x10 알루미늄 블록, 윗면 중앙에 Ø20 깊이 5 포켓, 모서리에서 8mm 위치 M5 관통 4개, 세로 모서리 R3
@@ -56,6 +64,20 @@
   {"op":"hole","face":"top","thread":"M5","pattern":"corners","inset":8},
   {"op":"fillet","edges":"vertical","r":3}],
  "expect":{"bbox":[100,60,10]},"notes":[]}
+
+요청: 속이 빈 직각삼각형 랙, 밑변 40 높이 300, 테 두께 4, 판 두께 15
+{"kind":"part3d","name":"triangle_rack","material":"POM","params":{"B":40,"H":300,"T":15,"W":4},
+ "base":{"type":"extrude","plane":"XY","points":[[0,0],["B",0],[0,"H"]],"wall":"W","h":"T"},"features":[],"expect":{"bbox":[40,300,15]},"notes":[]}
+
+요청: 120x60 판 두께 8, 네 모서리 R10, 가운데 40x20 사각 창(모서리 R3)
+{"kind":"part3d","name":"plate","material":"AL6061","params":{"L":120,"D":60,"T":8},
+ "base":{"type":"extrude","plane":"XY","points":[["-L/2","-D/2",10],["L/2","-D/2",10],["L/2","D/2",10],["-L/2","D/2",10]],"h":"T",
+         "holes":[[[-20,-10,3],[20,-10,3],[20,10,3],[-20,10,3]]]},"features":[],"expect":{"bbox":[120,60,8]},"notes":[]}
+
+요청: 지름 40 길이 80 원통을 한쪽 끝에서 30° 비스듬히 자름 (윗면 중심을 지나는 경사면)
+{"kind":"part3d","name":"sliced_cylinder","material":"AL6061","params":{"D":40,"H":80},
+ "base":{"type":"cylinder","d":"D","h":"H"},
+ "features":[{"op":"cut","shape":"plane","point":[0,0,"H-D/2*tan(30)"],"axis":"y","angle":30}],"notes":[]}
 
 ## 수정/수리
 - 메시지에 [현재 IR]이 있으면 그것을 기준으로 요청한 부분만 바꾸고 **전체 IR**을 다시 출력한다.

@@ -6,10 +6,12 @@ import math
 import os
 import resource as _res
 import sys
+import tempfile
+import time
 import traceback
 
-from build123d import (Align, Axis, Box, Circle, Cone, Cylinder, GeomType, Plane, Pos, Rectangle, RectangleRounded, Rot, SlotOverall, Sphere,
-                       Vector, chamfer, export_gltf, export_step, export_stl, extrude, fillet, offset, revolve, Polygon)
+from build123d import (Align, Axis, Box, Circle, Cone, Cylinder, GeomType, Part, Plane, Pos, Rectangle, RectangleRounded, Rot, SlotOverall, Sphere,
+                       Vector, chamfer, export_brep, export_gltf, export_step, export_stl, extrude, fillet, import_brep, offset, revolve, Polygon)
 
 C, MIN, MAX = Align.CENTER, Align.MIN, Align.MAX
 NORMAL = {"top": (0, 0, 1), "bottom": (0, 0, -1), "front": (0, -1, 0), "back": (0, 1, 0), "left": (-1, 0, 0), "right": (1, 0, 0)}
@@ -31,13 +33,38 @@ def base_solid(b):
     if t == "tube":
         return Cylinder(b["d"] / 2, b["h"], align=(C, C, MIN)) - Cylinder(b["id"] / 2, b["h"], align=(C, C, MIN))
     pl = {"XY": Plane.XY, "XZ": Plane.XZ, "YZ": Plane.YZ}[b["plane"]]
-    pts = b["points"]
-    face = pl * Polygon(*[tuple(p) for p in pts], align=None)
+    face = _rounded(pl, b["points"], b.get("radii"))
+    if b.get("wall"):  # 속 빈 단면: 외곽을 안쪽으로 wall 만큼 띄워 뺀다
+        inner = offset(face, amount=-b["wall"])
+        if not inner.faces() or inner.area <= 0:
+            raise BuildError(f"wall {b['wall']:g} 이 단면에 비해 너무 두꺼움 (안쪽 윤곽이 사라짐)")
+        face = face - inner
+    for h in b.get("holes") or []:
+        if h["type"] == "circle":
+            face = face - pl * Pos(*h["at"]) * Circle(h["d"] / 2)
+        else:
+            face = face - _rounded(pl, h["points"], h.get("radii"))
+    if not face.faces() or face.area <= 0:
+        raise BuildError("단면이 비었음 (holes/wall 이 외곽을 다 지움)")
     if t == "extrude":
         if b["plane"] == "XY":
             return extrude(face, amount=b["h"])
         return extrude(face, amount=b["h"] / 2, both=True)
     return revolve(face, Axis.Z, b.get("angle", 360))
+
+
+def _rounded(pl, pts, radii=None):
+    """평면 위 다각형. radii[k] > 0 인 꼭짓점은 그 반경으로 라운드 (2D fillet)."""
+    face = pl * Polygon(*[tuple(p) for p in pts], align=None)
+    for k, r in enumerate(radii or []):
+        if r and r > 0:
+            target = pl.from_local_coords(Vector(pts[k][0], pts[k][1], 0))
+            v = min(face.vertices(), key=lambda v: (Vector(v) - target).length)
+            try:
+                face = fillet(v, r)
+            except Exception as e:
+                raise BuildError(f"points[{k}] 라운드 r={r:g} 실패 (인접 변보다 큼?): {type(e).__name__}")
+    return face
 
 
 def face_frame(part, name):
@@ -132,6 +159,13 @@ def apply(part, f, checks, rules, diag):
         if op == "pocket":
             return part - extrude(sk, amount=f["depth"], dir=-n)
         return part + extrude(sk, amount=f["height"], dir=n)
+    if op == "cut" and f["shape"] == "plane":  # 경사 절단: point 를 지나는 평면의 normal 쪽 반공간 제거
+        big = diag * 4 + 10
+        half = Plane(origin=f["point"], z_dir=f["normal"]) * Box(big, big, big, align=(C, C, MIN))
+        out = part - half
+        if not out.solids():
+            raise BuildError("절단 평면이 부품 전체를 지움 (normal 방향 반대?)")
+        return out
     if op in ("add", "cut"):
         s = f["shape"]
         if s == "box":
@@ -149,11 +183,75 @@ def apply(part, f, checks, rules, diag):
         if f["t"] < rules.get("min_wall_mm", 1.0):
             checks.append({"id": "P3D-006", "severity": "warning", "msg": f"shell 벽 두께 {f['t']} mm < 최소 {rules.get('min_wall_mm', 1.0)} mm"})
         return offset(part, amount=-f["t"], openings=face)
-    if op == "fillet":
-        return fillet(edgeset(part, f["edges"]), f["r"])
-    if op == "chamfer":
-        return chamfer(edgeset(part, f["edges"]), f["d"])
+    if op in ("fillet", "chamfer"):
+        return round_edges(part, f, checks)
     raise BuildError(f"op {op} 미지원")
+
+
+class KernelFail(Exception):
+    pass
+
+
+def isolated(fn, part, timeout=90):
+    """OCC 연산을 fork 한 자식에서 실행 → BREP 로 받는다. 커널이 segfault 해도 워커는 살아남는다
+    (예: 삼각 프리즘에 단면 밖까지 나간 포켓 → 필렛에서 SIGSEGV)."""
+    fd, path = tempfile.mkstemp(suffix=".brep")
+    os.close(fd)
+    pid = os.fork()
+    if pid == 0:
+        code = 3
+        try:
+            out = fn(part)
+            if not out.is_valid or not out.solids():
+                raise KernelFail("결과 솔리드가 유효하지 않음")
+            export_brep(out, path)
+            code = 0
+        except BaseException as e:
+            with open(path + ".err", "w") as ef:
+                ef.write(f"{type(e).__name__}: {str(e)[:160]}")
+        os._exit(code)
+    try:
+        t0 = time.time()
+        while True:
+            done, st = os.waitpid(pid, os.WNOHANG)
+            if done:
+                break
+            if time.time() - t0 > timeout:
+                os.kill(pid, 9)
+                os.waitpid(pid, 0)
+                raise KernelFail(f"{timeout}s 초과")
+            time.sleep(0.02)
+        if os.WIFSIGNALED(st):
+            raise KernelFail(f"커널 비정상 종료 (신호 {os.WTERMSIG(st)})")
+        if os.WEXITSTATUS(st) != 0:
+            raise KernelFail(open(path + ".err").read() if os.path.exists(path + ".err") else f"종료 코드 {os.WEXITSTATUS(st)}")
+        return Part(import_brep(path).wrapped)
+    finally:
+        for q in (path, path + ".err"):
+            os.path.exists(q) and os.remove(q)
+
+
+def round_edges(part, f, checks):
+    """필렛·모따기: 원래 크기 → ×0.5 → ×0.25 순으로 시도, 모두 실패하거나 대상 모서리가 없으면 건너뛰고 경고 (빌드는 계속)."""
+    op, key = f["op"], ("r" if f["op"] == "fillet" else "d")
+    r0, tag = f[key], f"{f['op']} {key}={f[key]:g} ({f['edges']} 모서리)"
+    if not edgeset(part, f["edges"]):
+        checks.append({"id": "P3D-008", "severity": "warning", "repairable": False, "msg": f"{tag}: 해당 모서리가 없어 건너뜀"})
+        return part
+    last = None
+    for k in (1.0, 0.5, 0.25):
+        def run(p, r=r0 * k):
+            return (fillet if op == "fillet" else chamfer)(edgeset(p, f["edges"]), r)
+        try:
+            out = isolated(run, part)
+            if k < 1:
+                checks.append({"id": "P3D-008", "severity": "warning", "repairable": False,
+                               "msg": f"{tag}: 커널 실패로 {key}={r0 * k:g} 로 줄여 적용 ({last})"})
+            return out
+        except KernelFail as e:
+            last = str(e)
+    checks.append({"id": "P3D-008", "severity": "warning", "repairable": False, "msg": f"{tag}: ×1·×0.5·×0.25 모두 실패 → 건너뜀 ({last})"})
+    return part
 
 
 # ── 3면도 ─────────────────────────────────────────────────────────────────

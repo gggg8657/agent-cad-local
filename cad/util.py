@@ -120,7 +120,10 @@ def resolve_params(obj, params, text_keys=TEXT_KEYS):
     text_keys: 값을 글자 그대로 두는 키. 작업마다 다르다 (ICT 의 id 는 장비 ID, part3d tube 의 id 는 내경)."""
     names = {}
     for k, v in (params or {}).items():
-        names[k] = v if isinstance(v, (int, float)) else safe_eval(v, names)
+        try:
+            names[k] = v if isinstance(v, (int, float)) else safe_eval(v, names)
+        except Exception as e:
+            raise ValueError(f"params.{k} = {v!r} 계산 실패: {e}") from e
 
     def walk(o, key=None):
         if isinstance(o, dict):
@@ -142,13 +145,3 @@ def num(v, default=None):
     except (TypeError, ValueError):
         return default
 
-
-def num_expr(v, names, default=None):
-    """숫자 필드용: 숫자면 그대로, 문자열이면 params 이름·수식으로 평가 (키 이름과 무관하게 필드 타입 기준)."""
-    n = num(v)
-    if n is not None or not isinstance(v, str):
-        return default if n is None else n
-    try:
-        return safe_eval(v, names)
-    except Exception:
-        return default
