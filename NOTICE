@@ -1,31 +1,45 @@
 agent-cad-local
 ===============
 
-This package uses (unmodified, installed from PyPI):
+이 저장소의 원저작물(코드·UI·프롬프트·문서·도구 설계)은 DongJu Kim(gggg8657)이 작성했다.
+제3자 구성요소는 각자의 라이선스를 따르며 THIRD_PARTY_NOTICES.md 에 적었다.
+제3자 구성요소의 권리는 이 저장소의 라이선스로 바뀌지 않는다.
+
+연구·내부 시험용 프로토타입이다(배포·상업 서비스용 아님).
+
+Copyright (c) 2026 DongJu Kim (gggg8657) <gggg8657@gmail.com> — MIT License (LICENSE)
+
+This package uses (unmodified, installed from PyPI; pack.sh puts these wheels into the offline bundle):
 
   build123d — https://github.com/gumyr/build123d — Apache-2.0
     cadquery-ocp (OCP) — https://github.com/CadQuery/OCP — Apache-2.0
-    Open CASCADE Technology — https://dev.opencascade.org — LGPL-2.1 with OCCT exception
+    Open CASCADE Technology — https://github.com/Open-Cascade-SAS/OCCT — LGPL-2.1 with Open CASCADE exception
+      (the OCP wheel also ships FreeImage, LibRaw, libgomp and other native libraries — see THIRD_PARTY_NOTICES.md, issue #1)
   ezdxf — https://github.com/mozman/ezdxf — MIT
   shapely — https://github.com/shapely/shapely — BSD-3-Clause (GEOS: LGPL-2.1)
-
   pillow — https://github.com/python-pillow/Pillow — MIT-CMU (HPND)
 
 Bundled (static/, unmodified):
-  NanumGothic.ttf (static/fonts) — SIL Open Font License 1.1, © NAVER Corp. (static/fonts/OFL.txt)
+  NanumGothic.ttf (static/fonts) — SIL Open Font License 1.1, Copyright (c) 2010 NHN Corporation (현 NAVER),
+    Reserved Font Name Nanum (static/fonts/OFL.txt)
   three.js r128 (three.min.js, examples/js GLTFLoader.js, OrbitControls.js) — MIT, Copyright © 2010-2021 three.js authors
+    (static/LICENSE-three.txt)
 
 Design references (no code copied):
-  earthtojake/text-to-cad — 3D/DXF CAD agent skills
-  jeremylongshore/cad-ai-agent — "LLM plans typed operations, deterministic engine edits DXF" pattern
+  earthtojake/text-to-cad (MIT) — 3D/DXF CAD agent skills
+  jeremylongshore/cad-ai-agent (Apache-2.0) — "LLM plans typed operations, deterministic engine edits DXF" pattern
 
-GT images: gt/msr_ureca_like.png — 사용자 제공 개념도(출처 확인 전이라 공개 저장소에는 넣지 않음; 판독 정답 json 만 포함); gt/msr_3loop_synth.png — 본 도구가 생성
+Standards: ISO 273 / KS B ISO 2768 are referenced by number and values only; no standard text is included.
 
-Files authored for this package (MIT): app.py, ui.html, cad/*.py, prompts/*.md, rules/*.json, library/*.json, standards/*.json,
-  sample/make_sample.py, gt/*.json, bench_gt.py, selftest.py, setup.sh, pack.sh, README.md, GOAL.md
+GT images: gt/msr_ureca_like.png — 사용자 제공 개념도(출처 확인 전이라 공개 저장소에는 넣지 않음; 판독 정답 json 만 포함,
+  출처 확인 중 — issue #2); gt/msr_3loop_synth.png — 본 도구가 생성
+standards/ict_v1.json 의 표준 이름(KAERI_ICT_V1)에 기관명이 들어 있어 출처를 확인 중이다(issue #2).
+
+Files authored for this package (MIT): app.py, ui.html, cad/*.py, prompts/*.md, rules/*.json, library/*.json, standards/*.json, kb/,
+  sample/make_sample.py, gt/*.json, bench_gt.py, selftest.py, setup.sh, pack.sh, README.md, GOAL.md,
+  local_unified_cad_agent_architecture.md
 
 LLM (not bundled): called via an OpenAI-compatible API; default deployment is Ollama (https://github.com/ollama/ollama, MIT)
-  serving Google Gemma (gemma4:31b, https://ai.google.dev/gemma — see Gemma's terms of use).
+  serving Google Gemma 4 (gemma4:31b, Apache-2.0 — https://ai.google.dev/gemma/docs/gemma_4_license).
 
-This package: Copyright (c) 2026 gggg8657 <dongjukim.dev@gmail.com>
 화면 하단·메타데이터의 저작자 표기는 지우거나 바꾸지 마세요.

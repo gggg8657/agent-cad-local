@@ -2,6 +2,8 @@
 
 로컬 LLM은 좌표나 CAD 코드를 쓰지 않고 **Project IR(JSON)만** 씁니다. 형상은 결정론적 엔진(OpenCascade/build123d · ezdxf · 자체 배치·결선 엔진)이 만들고, 한 IR에서 STEP·STL·GLB·DXF·SVG·CSV·검증 보고서가 함께 나옵니다. 규칙 위반은 LLM 수리 루프(최대 3회)로 되돌립니다.
 
+> ⚠️ 연구·내부 시험용 프로토타입입니다(배포·상업 서비스용 아님). 제3자 구성요소의 라이선스는 THIRD_PARTY_NOTICES.md 를 확인하세요.
+
 ![3D 부품 화면 — ① 3D 탭 ② 리비전 선택 ③ 대화와 결과 이력](docs/img/cad-part3d.png)
 
 근거 설계: `local_unified_cad_agent_architecture.md` · 구현 범위와 완료 기준: `GOAL.md`
@@ -180,19 +182,23 @@ VLM 스캔도면 인식 · DWG(ODA 변환) · 어셈블리 구속 · GD&T · 벽
 ## 출처·감사 (Credits)
 
 - [build123d](https://github.com/gumyr/build123d) (Apache-2.0) — 파라메트릭 3D, STEP/STL/GLB
-  - [OCP / cadquery-ocp](https://github.com/CadQuery/OCP) (Apache-2.0), [Open CASCADE Technology](https://dev.opencascade.org) (LGPL-2.1 + OCCT exception)
+  - [OCP / cadquery-ocp](https://github.com/CadQuery/OCP) (Apache-2.0), [Open CASCADE Technology](https://dev.opencascade.org) (LGPL-2.1 + OCCT exception) — `pack.sh` 번들을 남에게 줄 때는 휠의 라이선스 파일을 지우지 말 것 ([#1](https://github.com/gggg8657/agent-cad-local/issues/1))
 - [ezdxf](https://github.com/mozman/ezdxf) (MIT) — DXF 읽기·쓰기
 - [shapely](https://github.com/shapely/shapely) (BSD-3-Clause, GEOS: LGPL-2.1) — 2D 검증
 - [Pillow](https://github.com/python-pillow/Pillow) (MIT-CMU/HPND) — 도면 PNG 렌더
 - 동봉: [three.js](https://github.com/mrdoob/three.js) r128 + GLTFLoader·OrbitControls (MIT, `static/LICENSE-three.txt`)
-- 동봉: 나눔고딕 NanumGothic.ttf (SIL Open Font License 1.1, © NAVER Corp., `static/fonts/OFL.txt`)
+- 동봉: 나눔고딕 NanumGothic.ttf (SIL Open Font License 1.1, Copyright (c) 2010 NHN Corporation(현 NAVER), `static/fonts/OFL.txt`)
 - 설계 참고(코드 복사 없음): [earthtojake/text-to-cad](https://github.com/earthtojake/text-to-cad), [jeremylongshore/cad-ai-agent](https://github.com/jeremylongshore/cad-ai-agent)
-- `gt/msr_ureca_like.png`(사용자 제공 개념도)는 출처 확인 전이라 저장소에 넣지 않았습니다. 판독 정답(`gt/msr_ureca_like.json`)만 있고, 그림이 없으면 selftest 의 이미지 역설계 검사는 건너뜁니다.
-- **LLM 실행** — OpenAI 호환 API 로 호출합니다(모델 가중치는 동봉하지 않음). 기본 배포는 [Ollama](https://github.com/ollama/ollama) (MIT) 위의 Google [Gemma](https://ai.google.dev/gemma) `gemma4:31b` — 모델 이용 조건은 Gemma 배포처 참고.
+- `gt/msr_ureca_like.png`(사용자 제공 개념도)는 출처 확인 전이라 저장소에 넣지 않았습니다(출처 확인 중 — [#2](https://github.com/gggg8657/agent-cad-local/issues/2), `standards/ict_v1.json` 의 이름 포함). 판독 정답(`gt/msr_ureca_like.json`)만 있고, 그림이 없으면 selftest 의 이미지 역설계 검사는 건너뜁니다.
+- **LLM 실행** — OpenAI 호환 API 로 호출합니다(모델 가중치는 동봉하지 않음). 기본 배포는 [Ollama](https://github.com/ollama/ollama) (MIT) 위의 Google [Gemma 4](https://ai.google.dev/gemma) `gemma4:31b` ([Apache-2.0](https://ai.google.dev/gemma/docs/gemma_4_license)).
 - 이 도구는 [agent-page-portal](https://github.com/gggg8657/agent-page-portal) 에 연결해 쓰도록 만들었습니다(단독 실행도 됨).
 
-저작권 표기·전체 목록은 `NOTICE` 를 보세요.
+버전·라이선스·상업 이용 여부 전체 표는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), 저작권 표기는 `NOTICE` 를 보세요.
 
 ## 라이선스
 
-MIT License — Copyright (c) 2026 gggg8657 (DongJu Kim). `LICENSE` 참고.
+MIT License — Copyright (c) 2026 DongJu Kim (gggg8657). `LICENSE` 참고. 제3자 구성요소는 각자의 라이선스를 따릅니다.
+
+## 만든 사람
+
+DongJu Kim (gggg8657) — 설계·구현
