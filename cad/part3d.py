@@ -9,7 +9,7 @@ import subprocess
 import sys
 
 from .part2d import CLEARANCE, density
-from .util import ROOT, num, resolve_params
+from .util import ROOT, TEXT_KEYS, num, num_expr, resolve_params
 
 TAP_DRILL = {"M2": 1.6, "M2.5": 2.05, "M3": 2.5, "M4": 3.3, "M5": 4.2, "M6": 5.0, "M8": 6.8, "M10": 8.5, "M12": 10.2, "M16": 14.0, "M20": 17.5}
 FACES = ("top", "bottom", "front", "back", "left", "right")
@@ -17,6 +17,7 @@ FACE_ALIAS = {"+z": "top", "-z": "bottom", "-y": "front", "+y": "back", "-x": "l
               "앞": "front", "뒤": "back", "왼쪽": "left", "오른쪽": "right", ">z": "top", "<z": "bottom", "<y": "front", ">y": "back",
               "<x": "left", ">x": "right"}
 BASES = ("box", "cylinder", "tube", "extrude", "revolve")
+TEXT_KEYS_3D = TEXT_KEYS - {"id"}  # part3d 에서 id 는 tube 내경(숫자) — ICT 장비 ID 와 다르다
 OPS = ("hole", "pocket", "boss", "add", "cut", "shell", "fillet", "chamfer")
 EDGESETS = ("vertical", "top", "bottom", "all", "x", "y")
 
@@ -36,7 +37,7 @@ def _vec(v, n=3, default=0.0):
 def normalize(ir):
     errs = []
     ir = dict(ir or {})
-    ir, params = resolve_params(ir, ir.get("params"))
+    ir, params = resolve_params(ir, ir.get("params"), TEXT_KEYS_3D)
     ir["kind"] = "part3d"
     ir.setdefault("name", "part")
     b = dict(ir.get("base") or {})
@@ -52,9 +53,12 @@ def normalize(ir):
         b["d"] = num(b.get("d") or b.get("od") or (num(b.get("r"), 0) * 2 if b.get("r") else None))
         b["h"] = num(b.get("h") or b.get("height"))
         if t == "tube":
-            b["id"] = num(b.get("id") or b.get("inner_d"))
-            if not b["id"] or b["id"] >= (b["d"] or 0):
-                errs.append("tube 는 0 < id < d")
+            raw = next((b[k] for k in ("id", "inner_d", "ID", "inner_diameter") if b.get(k) not in (None, "")), None)
+            b["id"] = num_expr(raw, params)
+            if b["id"] is None:
+                errs.append(f"tube 내경 id={raw!r} 를 숫자로 해석 못함 — 숫자 또는 params 에 정의된 이름·수식을 써라")
+            elif not 0 < b["id"] < (b["d"] or 0):
+                errs.append(f"tube 는 0 < id < d (지금 id={b['id']:g}, d={b['d'] or 0:g})")
         if not b["d"] or not b["h"]:
             errs.append(f"base {t} 에 d, h 필요")
     elif t in ("extrude", "revolve"):
@@ -199,12 +203,12 @@ def worker_python():
     return venv if os.path.exists(venv) else sys.executable
 
 
-def build(ir, outdir, rules, rev="R00", timeout=120):
+def build(ir, outdir, rules, rev="R00", timeout=120, stated=None):
     """worker3d 를 서브프로세스로 실행. 반환 dict(files, metrics, checks, error)."""
     os.makedirs(outdir, exist_ok=True)
     job = os.path.join(outdir, "_job.json")
     with open(job, "w", encoding="utf-8") as f:
-        json.dump({"ir": ir, "rules": rules, "rev": rev, "density": density(ir.get("material"))}, f, ensure_ascii=False)
+        json.dump({"ir": ir, "rules": rules, "rev": rev, "density": density(ir.get("material")), "stated": stated}, f, ensure_ascii=False)
     try:
         r = subprocess.run([worker_python(), "-m", "cad.worker3d", job, outdir], cwd=ROOT, capture_output=True, text=True, timeout=timeout,
                            env={**os.environ, "OMP_NUM_THREADS": "4"})

@@ -8,6 +8,7 @@
 import copy
 import csv
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -192,7 +193,16 @@ def next_rev(p):
 
 
 # ── 작업별 빌더 ──────────────────────────────────────────────────────────
-def build_part(task, ir, outdir, rev, emit):
+def ir_hash(ir):
+    return hashlib.sha1(json.dumps(ir, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
+def stated_numbers(text):
+    """사용자 문장에 숫자로 적힌 치수들 (100x60x10, Ø20, 2.5mm …). expect.bbox 가 사용자 치수인지 LLM 추정인지 가르는 데 쓴다."""
+    return sorted({float(x) for x in re.findall(r"(?<![\d.])\d+(?:\.\d+)?", text or "") if float(x) > 0})
+
+
+def build_part(task, ir, outdir, rev, emit, stated=None):
     rules = resource("rules", "part.json")
     if task == "part2d":
         n, errs = part2d.normalize(ir)
@@ -207,7 +217,7 @@ def build_part(task, ir, outdir, rev, emit):
     if errs:
         return n, {"error": "; ".join(errs)}
     emit({"stage": "build", "msg": "OpenCascade 솔리드 빌드 (서브프로세스)"})
-    r = part3d.build(n, outdir, rules, rev)
+    r = part3d.build(n, outdir, rules, rev, stated=stated)
     if r.get("error"):
         return n, {"error": r["error"]}
     previews = {}
@@ -512,8 +522,46 @@ def build_plant(ir, outdir, rev, emit):
                "_model": m, "_ga": ga, "principles": arch.get("principles", [])}
 
 
+def _fmt_part_read(j):
+    """vlm_part3d JSON → 설계 LLM 에 줄 판독 요약 (비율을 치수로 옮기라는 지시 포함)."""
+    L = []
+    for v in j.get("views") or []:
+        L.append(f"- 뷰 {v.get('panel', '')}: {v.get('view', '')} — {v.get('shows', '')}")
+    if j.get("shape"):
+        L.append(f"- 전체 형상: {j['shape']}")
+    pr = j.get("proportions") or {}
+    if all(isinstance(pr.get(k), (int, float)) for k in ("W", "D", "H")):
+        L.append(f"- **비율 X:Y:Z = {pr['W']:g} : {pr['D']:g} : {pr['H']:g}** (가장 긴 변 = 1). 치수가 없으면 가장 긴 변을 적당한 mm 로 정하고 "
+                 "나머지 축은 이 비율대로 정한다. 비율을 무시하고 표준 치수로 바꾸지 말 것.")
+    if j.get("thin"):
+        L.append("- 얇은 판/벽 형상 (두께 ≤ 가장 긴 변의 1/10)")
+    for k, lab in (("front_profile", "정면 외곽"), ("hollow", "속 빔·관통")):
+        if j.get(k):
+            L.append(f"- {lab}: {j[k]}")
+    for h in j.get("holes") or []:
+        L.append(f"- 구멍 {h.get('count', '?')}개, 지름≈가장 긴 변×{h.get('d_rel', '?')}, {'관통' if h.get('through', True) else '막힘'}, 위치: {h.get('where', '')}")
+    L += [f"- 피처: {f}" for f in j.get("features") or []]
+    if j.get("dims_visible"):
+        L.append("- 보이는 치수: " + ", ".join(map(str, j["dims_visible"])))
+    L += [f"- 불확실: {u}" for u in j.get("uncertain") or []]
+    return "\n".join(L)
+
+
 def vlm_describe(img, task, model, outdir, emit, r):
     emit({"stage": "vlm", "msg": "첨부 이미지 판독 (VLM, 로컬)"})
+    if task == "part3d":  # 3D 부품: 뷰 식별·비율·구멍을 구조화해 받는다 (정성 서술만으로는 비율을 잃음)
+        try:
+            j = extract_json(llm.chat(prompt("vlm_part3d"), [{"role": "user", "content": "이 그림을 판독해라."}], llm.VISION_MODEL or model,
+                                      json_mode=True, images=[img]))
+            dump_json(os.path.join(outdir, "vlm_describe.json"), j)
+            out = _fmt_part_read(j)
+            write(os.path.join(outdir, "vlm_describe.md"), out)
+            r.setdefault("files", {})["vlm_describe.md"] = "VLM 이미지 판독 (뷰·비율·구멍)"
+            r["vlm_summary"] = out
+            emit({"log": "VLM 판독: " + out.replace("\n", " ")[:160]})
+            return "\n\n[이미지 판독 — 명령이 우선, 판독은 참고]\n" + out
+        except Exception as e:
+            emit({"log": f"VLM 구조 판독 실패 → 서술형으로: {e}"})
     try:
         out = llm.chat(prompt("vlm_describe"), [{"role": "user", "content": f"작업: {task}. 이 그림을 판독해라."}], llm.VISION_MODEL or model, images=[img])
     except Exception as e:
@@ -576,6 +624,65 @@ def build_assembly(ir, outdir, rev, emit):
                "components": len([c for c in m["components"] if c["type"] != "pipe"]), **w.get("metrics", {})}
     return n, {"files": files, "checks": checks, "metrics": metrics, "previews": previews, "assumptions": m["assumptions"], "calc": m["calc"],
                "_model": m, "_ga": ga}
+
+
+def visual_compare_part(img, outdir, stl, model, emit):
+    """3D 부품 결과 STL 을 등각·정면·평면으로 렌더 (numpy, 로컬) → 참조 그림과 함께 VLM 비교."""
+    from . import render3d
+    png = render3d.panel(os.path.join(outdir, stl), os.path.join(outdir, "part_render.png"))
+    emit({"stage": "vlm", "msg": "시각 자기검증: 참조 그림 vs 결과 렌더 (VLM)"})
+    try:
+        out = llm.chat(prompt("vlm_compare_part"), [{"role": "user", "content": "참조(1)와 결과 렌더(2)를 비교."}], llm.VISION_MODEL or model,
+                       json_mode=True, images=[img, open(png, "rb").read()])
+        v = extract_json(out)
+        v["match"] = float(v.get("match") or 0)
+        return v
+    except Exception as e:
+        emit({"log": f"시각 비교 실패: {e}"})
+        return None
+
+
+def post_part3d(p, r, ir, res, img, text, extra, model, outdir, rev, emit, stated):
+    """그림 첨부 3D 부품: 결과 렌더를 참조와 VLM 비교 → 일치도가 낮으면 1회 시각 수리, 더 나은 쪽 채택 (assembly 의 post_assembly 와 같은 구조)."""
+    stl = next((f for f in res.get("files") or {} if f.endswith(".stl")), None)
+    if not img or not stl or p["revisions"]:
+        return ir, res
+    v = visual_compare_part(img, outdir, stl, model, emit)
+    if v is None:
+        return ir, res
+    highs = [d for d in v.get("differences") or [] if d.get("severity") == "high"]
+    if v["match"] < VIS_MIN and highs:
+        emit({"stage": "repair", "msg": f"시각 수리: 일치 {v['match']:.0f} < {VIS_MIN:.0f} — " + "; ".join(d.get("what", "") for d in highs)[:160]})
+        diff = "\n".join(f"- {d.get('what')} → {d.get('fix', '')}" for d in highs)
+        msgs = [{"role": "user", "content": f"[현재 IR]\n{json.dumps(ir, ensure_ascii=False)}\n\n[원래 요청]\n{text}{extra}\n\n"
+                                            f"[시각 비교 차이 — 참조 그림과 다름]\n{diff}\n\n그림과 같아지도록 고친 전체 IR을 출력."}]
+        tmp = outdir + "_vis"
+        try:
+            ir2, _ = ask_json(prompt("part3d"), msgs, model, emit, "3D 부품 (시각 수리)")
+            os.makedirs(tmp, exist_ok=True)
+            res2 = _build("part3d", ir2, tmp, rev, emit, None, stated)
+            stl2 = next((f for f in res2.get("files") or {} if f.endswith(".stl")), None)
+            v2 = visual_compare_part(img, tmp, stl2, model, emit) if stl2 and not _repairable(res2) else None
+            if v2 is not None and v2["match"] > v["match"]:
+                for f in list(res.get("files") or {}) + ["drawing.svg", "part_render.png"]:
+                    os.path.exists(os.path.join(outdir, f)) and os.remove(os.path.join(outdir, f))
+                for f in os.listdir(tmp):
+                    shutil.move(os.path.join(tmp, f), os.path.join(outdir, f))
+                dump_json(os.path.join(outdir, "attempt_visual.json"), ir2)
+                ir, res, v = ir2, res2, v2
+                r["visual_repair"] = "채택"
+                emit({"log": f"시각 수리 채택: 일치 {v['match']:.0f}"})
+            else:
+                r["visual_repair"] = "기각 (개선 없음)"
+                emit({"log": "시각 수리 기각 — 원래 설계 유지"})
+        except Exception as e:
+            emit({"log": f"시각 수리 실패: {e}"})
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    r["visual"] = v
+    dump_json(os.path.join(outdir, "visual_compare.json"), v)
+    res.setdefault("files", {}).update({"part_render.png": "결과 렌더 (시각 비교 입력)", "visual_compare.json": "시각 자기검증 결과"})
+    return ir, res
 
 
 def visual_compare(img, outdir, ga, model, emit):
@@ -749,6 +856,8 @@ def run(text, task="auto", pid=None, upload=None, model=None, emit=lambda e: Non
     if p["revisions"] and p["revisions"][-1].get("ir"):
         prev_ir = load_json(os.path.join(pdir(p["id"]), p["revisions"][-1]["rev"], "ir.json"))
     ir = None
+    seen, stale = {}, False  # IR 해시 → 빌드 결과 (같은 IR 반복 감지)
+    stated = stated_numbers(" ".join(m["content"] for m in p["messages"] if m.get("role") == "user")) if task == "part3d" else None
     for attempt in range(1, MAX_REPAIR + 2):
         r["attempts"] = attempt
         try:
@@ -760,16 +869,30 @@ def run(text, task="auto", pid=None, upload=None, model=None, emit=lambda e: Non
             r.update(error=f"LLM 실패: {type(e).__name__}: {e}", status="failed")
             return finish(p, r, outdir, emit)
         dump_json(os.path.join(outdir, f"attempt{attempt}.json"), ir)  # 수리 이력 (디버깅·감사용)
-        res = _build(task, ir, outdir, rev, emit, base)
+        h = ir_hash(ir)
+        repeat = h in seen
+        if repeat:  # 같은 IR 을 또 냄 → 다시 빌드하지 않는다
+            res = seen[h]
+            emit({"log": f"수리 {attempt - 1}: 직전과 같은 IR — " + ("수리 중단" if stale else "원인 힌트를 붙여 1회 더")})
+        else:
+            res = _build(task, ir, outdir, rev, emit, base, stated)
+            seen[h] = res
         problems = _repairable(res)
         if problems:
             write(os.path.join(outdir, f"attempt{attempt}.err.txt"), problems)
-        if not problems or attempt > MAX_REPAIR:
+        if not problems or attempt > MAX_REPAIR or (repeat and stale):
             break
         emit({"stage": "repair", "msg": f"수리 {attempt}/{MAX_REPAIR}: " + problems[:200]})
-        msgs = [{"role": "user", "content": f"[현재 IR]\n{json.dumps(ir, ensure_ascii=False)}\n\n[원래 요청]\n{text}{extra}\n\n[오류]\n{problems}\n\n오류를 고친 전체 IR을 출력."}]
+        hint = ""
+        if repeat:
+            stale = True
+            hint = ("\n\n[주의] 직전 수리에서 IR 을 하나도 바꾸지 않았다. 같은 IR 은 같은 오류를 낸다. 오류 문구의 값·키를 다시 보고, "
+                    "params 이름 대신 숫자를 직접 쓰거나 다른 피처 조합으로 바꿔라.")
+        msgs = [{"role": "user", "content": f"[현재 IR]\n{json.dumps(ir, ensure_ascii=False)}\n\n[원래 요청]\n{text}{extra}\n\n[오류]\n{problems}{hint}\n\n오류를 고친 전체 IR을 출력."}]
     if task == "assembly" and not res.get("error"):
         ir, res = post_assembly(p, r, ir, res, img, text, extra, model, outdir, rev, emit)
+    if task == "part3d" and img and not res.get("error"):
+        ir, res = post_part3d(p, r, ir, res, img, text, extra, model, outdir, rev, emit, stated)
     r["ir"] = True
     dump_json(os.path.join(outdir, "ir.json"), ir)
     files0 = r.get("files") or {}
@@ -833,12 +956,12 @@ def post_assembly(p, r, ir, res, img, text, extra, model, outdir, rev, emit):
     return ir, res
 
 
-def _build(task, ir, outdir, rev, emit, base):
+def _build(task, ir, outdir, rev, emit, base, stated=None):
     try:
         if task == "assembly":
             n, res = build_assembly(ir, outdir, rev, emit)
         else:
-            n, res = build_ict(ir, outdir, rev, emit, base) if task == "ict" else build_part(task, ir, outdir, rev, emit)
+            n, res = build_ict(ir, outdir, rev, emit, base) if task == "ict" else build_part(task, ir, outdir, rev, emit, stated)
         res["notes"] = (n or {}).get("notes") or []  # 정규화 단계에서 엔진이 덧붙인 메모 포함
         return res
     except Exception as e:

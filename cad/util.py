@@ -115,8 +115,9 @@ TEXT_KEYS = {"name", "id", "type", "op", "face", "edges", "material", "text", "k
              "label", "axis", "prefix", "space", "medium", "from", "to", "floor", "block", "layer", "tag", "value", "zone", "title", "shape", "near"}
 
 
-def resolve_params(obj, params):
-    """IR 안의 문자열 수식("W/2")을 숫자로. params 자체도 앞에서부터 순서대로 평가."""
+def resolve_params(obj, params, text_keys=TEXT_KEYS):
+    """IR 안의 문자열 수식("W/2")을 숫자로. params 자체도 앞에서부터 순서대로 평가.
+    text_keys: 값을 글자 그대로 두는 키. 작업마다 다르다 (ICT 의 id 는 장비 ID, part3d tube 의 id 는 내경)."""
     names = {}
     for k, v in (params or {}).items():
         names[k] = v if isinstance(v, (int, float)) else safe_eval(v, names)
@@ -126,7 +127,7 @@ def resolve_params(obj, params):
             return {k: walk(v, k) for k, v in o.items() if k != "params"} | ({"params": o["params"]} if "params" in o else {})
         if isinstance(o, list):
             return [walk(v, key) for v in o]
-        if isinstance(o, str) and key not in TEXT_KEYS:
+        if isinstance(o, str) and key not in text_keys:
             try:
                 return safe_eval(o, names)
             except Exception:
@@ -139,4 +140,15 @@ def num(v, default=None):
     try:
         return float(v)
     except (TypeError, ValueError):
+        return default
+
+
+def num_expr(v, names, default=None):
+    """숫자 필드용: 숫자면 그대로, 문자열이면 params 이름·수식으로 평가 (키 이름과 무관하게 필드 타입 기준)."""
+    n = num(v)
+    if n is not None or not isinstance(v, str):
+        return default if n is None else n
+    try:
+        return safe_eval(v, names)
+    except Exception:
         return default

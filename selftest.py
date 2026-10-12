@@ -101,6 +101,53 @@ try:
     p = pipeline.run("L 브래킷", "part3d", emit=emit)
     r = p["revisions"][-1]
     ok(r["attempts"] == 2 and r["status"] == "pass", f"면 밖 구멍(P3D-004) → 수리 → pass, 질량 {r['metrics'].get('mass_g')} g")
+    # tube 내경을 params 이름으로 (id 는 ICT 에선 텍스트 키지만 part3d 에선 숫자 필드)
+    ring = {"kind": "part3d", "name": "ring", "material": "SUS304", "params": {"OD": 150, "ID": 120, "H": 5},
+            "base": {"type": "tube", "d": "OD", "id": "ID", "h": "H"},
+            "features": [{"op": "hole", "face": "top", "d": 8, "pattern": "polar", "n": 3, "pcd": 135}], "expect": {"bbox": [150, 150, 5]}}
+    QUEUE[:] = [ring]
+    p = pipeline.run("외경 150 내경 120 두께 5 링, 구멍 3개", "part3d", emit=emit)
+    r = p["revisions"][-1]
+    ok(r["attempts"] == 1 and r["status"] == "pass" and r["metrics"]["bbox_mm"] == [150, 150, 5], f"tube id='ID'(params 이름) → 1회에 pass ({r['status']} {r.get('error') or ''})")
+    ok(util.resolve_params({"id": "CAM-01"}, {"CAM": 1})[0]["id"] == "CAM-01", "ICT 의 id 는 여전히 텍스트로 보존")
+    # 같은 IR 을 되풀이하면 힌트 1회 후 수리 중단 (헛도는 수리 루프 방지)
+    bad_tube = dict(ring, base={"type": "tube", "d": "OD", "id": "IDX", "h": "H"})
+    QUEUE[:] = [bad_tube, bad_tube, bad_tube, bad_tube]
+    p = pipeline.run("링", "part3d", emit=emit)
+    r = p["revisions"][-1]
+    ok(r["status"] == "failed" and r["attempts"] == 3 and "IDX" in r["error"], f"같은 IR 반복 → 3번째에 중단, 오류에 원인 값 표시 ({r['attempts']}회)")
+    ok("[주의]" in SEEN[-1][1][0]["content"], "반복 IR 이면 수리 프롬프트에 '바꾸지 않았다' 힌트")
+    # expect.bbox: 사용자가 말하지 않은 축은 LLM 추정 → 경고만 (수리 안 함), 말한 축은 오류 → 수리
+    blk = {"kind": "part3d", "name": "blk", "material": "AL6061", "base": {"type": "box", "size": [60, 40, 20]},
+           "features": [{"op": "boss", "face": "top", "shape": "circle", "d": 20, "at": [0, 0], "height": 10}], "expect": {"bbox": [60, 40, 20]}}
+    QUEUE[:] = [blk]
+    p = pipeline.run("보스 달린 블록", "part3d", emit=emit)
+    r = p["revisions"][-1]
+    ok(r["attempts"] == 1 and r["status"] == "warnings" and any(c["id"] == "P3D-005" and c["severity"] == "warning" for c in r["checks"]),
+       f"치수 없는 요청의 LLM 추정 외형 불일치 → 경고, 수리 없음 ({r['status']})")
+    QUEUE[:] = [blk, dict(blk, base={"type": "box", "size": [60, 40, 20]}, features=blk["features"][:0] + [dict(blk["features"][0], height=10)],
+                          expect={"bbox": [60, 40, 30]})]
+    p = pipeline.run("60x40x30 블록, 위에 Ø20 보스 높이 10", "part3d", emit=emit)
+    r = p["revisions"][-1]
+    ok(r["attempts"] == 2 and r["status"] == "pass", f"사용자가 말한 외형(30)과 다르면 오류 → 수리 → pass ({r['status']})")
+    # 그림 첨부 3D: 구조 판독(비율) → 설계 → 결과 렌더 시각 비교 → 일치 낮으면 1회 시각 수리, 나은 쪽 채택
+    import io
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 64), "white").save(buf, "PNG")
+    up = pipeline.save_upload("ref.png", buf.getvalue())
+    plate = {"kind": "part3d", "name": "plate", "material": "AL6061", "base": {"type": "box", "size": [60, 40, 20]}, "features": []}
+    QUEUE[:] = [{"views": [{"panel": "왼쪽", "view": "등각", "shows": "판"}], "shape": "얇은 사각 판", "proportions": {"W": 1.0, "D": 0.5, "H": 0.05}, "thin": True},
+                plate, {"match": 30, "differences": [{"what": "두께가 너무 두꺼움", "severity": "high", "fix": "Z 를 X 의 0.05 로"}]},
+                dict(plate, base={"type": "box", "size": [100, 50, 5]}), {"match": 85, "differences": []}]
+    p = pipeline.run("첨부 그림대로 3D 부품", "part3d", upload=up, emit=emit)
+    r = p["revisions"][-1]
+    d = os.path.join(pipeline.pdir(p["id"]), "R00")
+    ok(any("비율 X:Y:Z = 1 : 0.5 : 0.05" in m[1][0]["content"] for m in SEEN[-4:]),
+       "그림 판독 비율이 설계 프롬프트에 들어감")
+    ok(r.get("visual_repair") == "채택" and r["visual"]["match"] == 85 and r["metrics"]["bbox_mm"] == [100, 50, 5]
+       and all(os.path.exists(os.path.join(d, f)) for f in ("part_render.png", "visual_compare.json", "attempt_visual.json")),
+       f"시각 비교 일치 30 → 시각 수리 → 85 채택, 결과 렌더 저장 ({r.get('visual_repair')})")
 
     # 3) ICT — 엔진 자동 산정(분기실·스위치·NVR) + 규칙
     print("[ICT 배치도·개황도]")

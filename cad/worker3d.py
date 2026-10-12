@@ -255,6 +255,23 @@ def drawing(part, ir, metrics, outdir, rev):
     return os.path.basename(p)
 
 
+def bbox_checks(exp, got, tol, stated=None):
+    """P3D-005 기대 외형. stated=None(IR 직접 편집·재빌드)이면 전부 사용자 값 → error.
+    stated=[사용자 문장의 숫자들] 이면 그 숫자와 같은 축만 error, 나머지는 LLM 이 추정한 값이므로 warning (수리 루프를 돌리지 않음)."""
+    bad = [(i, float(a), b) for i, (a, b) in enumerate(zip(exp, got)) if abs(float(a) - b) > tol]
+    if not bad:
+        return []
+    user = [x for x in bad if stated is None or any(abs(x[1] - s) <= max(tol, 1e-3 * s) for s in stated)]
+    out = []
+    if user:
+        out.append({"id": "P3D-005", "severity": "error", "msg": f"외형 {got} 가 요구 {exp} 와 다름 (사용자 지정 축: {'XYZ'[user[0][0]]}…)"})
+    guess = [x for x in bad if x not in user]
+    if guess:
+        out.append({"id": "P3D-005", "severity": "warning", "repairable": False,
+                    "msg": f"외형 {got} 가 LLM 추정 외형 {exp} 와 다름 (사용자가 말하지 않은 축 {''.join('XYZ'[x[0]] for x in guess)} — 참고)"})
+    return out
+
+
 def main(job_path, outdir):
     try:
         pass  # RLIMIT_AS 는 쓰지 않음: OCC 멀티스레드 가상메모리 예약과 충돌해 무한 대기. 타임아웃으로만 보호
@@ -304,9 +321,7 @@ def main(job_path, outdir):
             checks.append({"id": "P3D-003", "severity": "error", "msg": "부피 0"})
         exp = (ir.get("expect") or {}).get("bbox")
         if exp:
-            tol = rules.get("bbox_tol_mm", 0.05)
-            if any(abs(float(a) - b) > tol for a, b in zip(exp, m["bbox_mm"])):
-                checks.append({"id": "P3D-005", "severity": "error", "msg": f"외형 {m['bbox_mm']} 가 요구 {exp} 와 다름"})
+            checks += bbox_checks(exp, m["bbox_mm"], rules.get("bbox_tol_mm", 0.05), job.get("stated"))
         export_step(part, os.path.join(outdir, f"{name}.step"))
         res["files"][f"{name}.step"] = "STEP (교환 표준)"
         export_stl(part, os.path.join(outdir, f"{name}.stl"), tolerance=0.02, angular_tolerance=0.15)
