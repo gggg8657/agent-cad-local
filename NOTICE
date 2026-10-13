@@ -7,7 +7,7 @@ agent-cad-local
 
 연구·내부 시험용 프로토타입이다(배포·상업 서비스용 아님).
 
-Copyright (c) 2026 DongJu Kim (gggg8657) <gggg8657@gmail.com> — PolyForm Noncommercial License 1.0.0 (LICENSE)
+Copyright (c) 2026 DongJu Kim (gggg8657) <dongjukim.dev@gmail.com> — PolyForm Noncommercial License 1.0.0 (LICENSE)
 
 This package uses (unmodified, installed from PyPI; pack.sh puts these wheels into the offline bundle):
 
