@@ -169,7 +169,8 @@ async function kbShow(id){ const a=await (await fetch("api/kb/"+id)).json(); con
     if(Object.keys(design).length) patch.design=design;
     const r=await fetch("api/kb/"+id,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({patch,author:$("kbWho").value,note:$("kbWhy").value})}); const j=await r.json();
     if(j.error){ $("kbMsg").textContent="✘ "+j.error; return; } $("kbMsg").textContent="✔ 저장됨 — 다음 요청부터 반영"; kbList(); kbShow(id); };
-  $("kbReset").onclick=async()=>{ if(!confirm("사용자 수정을 지우고 원본으로? (백업 파일은 남습니다)")) return; await fetch(`api/kb/${id}/reset`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}); kbList(); kbShow(id); };
+  if(!a.can_edit){ $("kbSave").disabled=$("kbReset").disabled=true; $("kbMsg").textContent=a.user_added?"만든 사람이나 관리자만 고칠 수 있습니다 — '복제해 새 원형'으로 내 원형을 만들어 고치세요":"기본 지식은 관리자만 고칠 수 있습니다 — '복제해 새 원형'으로 내 원형을 만들어 고치세요"; }
+  $("kbReset").onclick=async()=>{ if(!confirm("사용자 수정을 지우고 원본으로? (백업 파일은 남습니다)")) return; const r=await fetch(`api/kb/${id}/reset`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}); const j=await r.json().catch(()=>({})); if(j.error){ $("kbMsg").textContent="✘ "+j.error; return; } kbList(); kbShow(id); };
   $("kbClone").onclick=async()=>{ const nid=prompt("새 원형 id (영소문자·숫자·_)", id+"_custom"); if(!nid) return; const name=prompt("이름", a.name+" (사내안)"); if(!name) return;
     const patch={}; ["name","summary","aliases","principles","checks","design","source","sizing","components","connections","loops","kind","coolant"].forEach(k=>{ if(a[k]!==undefined) patch[k]=a[k]; }); patch.name=name;
     const r=await fetch("api/kb/"+nid,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({patch,author:$("kbWho").value,note:"복제: "+id})}); const j=await r.json();

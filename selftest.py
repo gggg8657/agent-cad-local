@@ -313,6 +313,24 @@ try:
     ok(kb.get("sfr_pool")["history"][-1]["author"] == "테스트", "수정 이력 기록")
     kb.reset_override("sfr_pool")
     ok(not kb.get("sfr_pool").get("edited"), "원본 복원")
+    # 공유 지식 DB 권한: 기본 원형은 관리자만, 추가 원형은 만든 사람·관리자만
+    def denied(f):
+        try:
+            f()
+            return False
+        except PermissionError:
+            return True
+    ok(denied(lambda: kb.save_override("sfr_pool", {"summary": "x"}, user="alice")) and denied(lambda: kb.reset_override("sfr_pool", user="alice")),
+       "기본 원형 수정·되돌리기는 관리자만")
+    kb.save_override("st_alice", {"name": "앨리스 원형"}, user="alice")
+    ok(denied(lambda: kb.save_override("st_alice", {"summary": "y"}, user="bob")) and denied(lambda: kb.reset_override("st_alice", user="bob")),
+       "남이 추가한 원형은 못 고침")
+    kb.save_override("st_alice", {"summary": "y"}, user="alice")
+    ok(kb.public(kb.get("st_alice"), "bob")["can_edit"] is False and "created_by" not in kb.public(kb.get("st_alice"), "bob")
+       and kb.public(kb.get("st_alice"), "alice")["can_edit"], "응답에 만든 사람 id 대신 can_edit")
+    kb.reset_override("st_alice", user="owner")
+    ok("st_alice" not in kb.load_all(), "관리자는 남의 원형도 되돌림")
+    ok(util.scrub("x /home/u/a/b.json http://127.0.0.1:11436/api 10.1.2.3:8000") == "x …/b.json (내부 주소) (내부 주소)", "응답 문구에서 경로·내부 주소 지움")
     # 이미지 선택 입력: 명령에 작업 단서가 있으면 명령 우선
     ok(pipeline.route("이 도면대로 3D 브래킷", False, has_img=True, img=b"x")[0] == "part3d", "이미지 + '3D 브래킷' 명령 → 3D 부품 (명령 우선)")
 

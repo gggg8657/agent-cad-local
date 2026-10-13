@@ -8,6 +8,24 @@ import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# 응답·보고서에 서버 내부 정보(절대 경로, 내부 주소)가 새지 않게 지운다
+_ABS = re.compile(r"(?<![\w.:/])/(?:home|tmp|opt|usr|var|root|mnt|srv|data|etc|proc|run)/[^\s'\"`,;)\]}>]*")
+_URL = re.compile(r"\b(?:https?|wss?)://[^\s'\"`,;)\]}>]+")
+_HOST = re.compile(r"\b(?:localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+)(?::\d+)?\b")
+
+
+def scrub(x):
+    """문자열(또는 그 안의 dict·list 문자열)에서 절대 경로·URL·내부 호스트 주소를 가린다."""
+    if isinstance(x, str):
+        x = _URL.sub("(내부 주소)", x)
+        x = _ABS.sub(lambda m: "…/" + os.path.basename(m.group(0).rstrip("/")), x)
+        return _HOST.sub("(내부 주소)", x)
+    if isinstance(x, dict):
+        return {k: scrub(v) for k, v in x.items()}
+    if isinstance(x, list):
+        return [scrub(v) for v in x]
+    return x
+
 
 def read(p):
     with open(p, encoding="utf-8") as f:

@@ -15,7 +15,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from cad import llm, pipeline
-from cad.util import ROOT, read, resource
+from cad.util import ROOT, read, resource, scrub
 
 PORT = int(os.environ.get("PORT", "8778"))
 WS = pipeline.WS
@@ -25,9 +25,15 @@ CTYPE = {".svg": "image/svg+xml", ".dxf": "application/dxf", ".step": "applicati
          ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
 
 
+def agent_user(h):
+    """포털이 넘긴 사용자(로그인 확인됨). 관리자·서버 안 접속·헤더 없음(단독 실행) = owner"""
+    return (h.headers.get("X-Agent-User") or "owner").strip() or "owner"
+
+
 def user_ws(h):
-    """포털이 넘긴 사용자별 작업 폴더. owner(서버 주인)·헤더 없음(단독 실행) = 예전 WORKSPACE 그대로"""
-    u = (h.headers.get("X-Agent-User") or "owner").strip()
+    """포털이 넘긴 사용자별 작업 폴더. owner(서버 주인)·헤더 없음(단독 실행) = 예전 WORKSPACE 그대로.
+    프로젝트·업로드는 이 폴더 안에서만 찾으므로 다른 사용자의 것은 id 를 알아도 열거나 숨길 수 없다."""
+    u = agent_user(h)
     if u == "owner":
         return WS
     d = os.path.join(WS, "u", re.sub(r"[^A-Za-z0-9_.-]", "_", u)[:64] or "_")
@@ -67,7 +73,7 @@ class H(BaseHTTPRequestHandler):
                 try:
                     return self._send({"models": llm.models(), "default": llm.MODEL, "api": llm.LLM_API})
                 except Exception as e:
-                    return self._send({"models": [llm.MODEL], "default": llm.MODEL, "error": str(e)})
+                    return self._send({"models": [llm.MODEL], "default": llm.MODEL, "error": scrub(f"LLM 서버 응답 없음 ({type(e).__name__})")})
             if path == "/api/projects":
                 q = urllib.parse.parse_qs(u.query)
                 return self._send(pipeline.list_projects(owner=(q.get("owner") or [None])[0], show_all="all" in q))
@@ -78,7 +84,7 @@ class H(BaseHTTPRequestHandler):
             m = re.fullmatch(r"/api/kb/([a-z0-9_]+)", path)
             if m:
                 from cad import kb
-                return self._send(kb.get(m.group(1)))
+                return self._send(kb.public(kb.get(m.group(1)), agent_user(self)))
             if path == "/api/gt":
                 return self._send(pipeline.list_gt())
             m = re.fullmatch(r"/api/gt/([\w\-]+)\.(png|jpg|json)", path)
@@ -92,7 +98,11 @@ class H(BaseHTTPRequestHandler):
                                    "part_rules": resource("rules", "part.json")})
             m = re.fullmatch(r"/api/projects/([0-9]{8}-[0-9a-f]{6})", path)
             if m:
-                return self._send(pipeline.load(m.group(1)))
+                p = pipeline.load(m.group(1))
+                for r in p.get("revisions") or []:
+                    if r.get("error"):
+                        r["error"] = scrub(r["error"])
+                return self._send(p)
             m = re.fullmatch(r"/api/projects/([0-9]{8}-[0-9a-f]{6})/(R\d{2}|input)/([^/]+)", path)
             if m:
                 name = urllib.parse.unquote(m.group(3))
@@ -106,10 +116,12 @@ class H(BaseHTTPRequestHandler):
                 hdr = {"Content-Disposition": "attachment; filename*=UTF-8''" + urllib.parse.quote(name)} if "dl" in q else {}
                 return self._send(data, CTYPE.get(ext) or mimetypes.guess_type(name)[0] or "application/octet-stream", extra=hdr)
             self._send({"error": "없음"}, code=404)
-        except FileNotFoundError:
+        except (FileNotFoundError, KeyError):
             self._send({"error": "없음"}, code=404)
-        except Exception as e:
-            self._send({"error": f"{type(e).__name__}: {e}"}, code=500)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            self._send({"error": "서버 내부 오류"}, code=500)
 
     def _sse(self, fn):
         self.send_response(200)
@@ -120,6 +132,9 @@ class H(BaseHTTPRequestHandler):
         self.close_connection = True
 
         def emit(ev):
+            for k in ("error", "log", "msg"):
+                if isinstance(ev.get(k), str):
+                    ev = {**ev, k: scrub(ev[k])}
             try:
                 self.wfile.write(f"data: {json.dumps(ev, ensure_ascii=False)}\n\n".encode())
                 self.wfile.flush()
@@ -130,7 +145,7 @@ class H(BaseHTTPRequestHandler):
         except Exception as e:
             import traceback
             traceback.print_exc()
-            emit({"error": f"{type(e).__name__}: {e}"})
+            emit({"error": scrub(f"{type(e).__name__}: {e}")})
 
     def do_POST(self):
         pipeline.use_ws(user_ws(self))
@@ -140,7 +155,12 @@ class H(BaseHTTPRequestHandler):
             if self.path == "/api/upload":
                 name = urllib.parse.unquote(self.headers.get("X-Filename") or "upload.dxf")
                 return self._send({"upload": pipeline.save_upload(name, body), "name": name})
-            req = json.loads(body or b"{}")
+            try:
+                req = json.loads(body or b"{}")
+            except ValueError:
+                return self._send({"error": "JSON 본문이 아님"}, code=400)
+            if not isinstance(req, dict):
+                return self._send({"error": "JSON 객체여야 함"}, code=400)
             if self.path == "/api/run":
                 text = (req.get("prompt") or "").strip()
                 if not text:
@@ -150,17 +170,27 @@ class H(BaseHTTPRequestHandler):
             m = re.fullmatch(r"/api/kb/([a-z0-9_]+)(/reset)?", self.path)
             if m:
                 from cad import kb
+                user = agent_user(self)
                 if m.group(2):
-                    return self._send(kb.reset_override(m.group(1), req.get("author", "")) or {"ok": True})
-                return self._send(kb.save_override(m.group(1), req.get("patch") or {}, req.get("author", ""), req.get("note", "")))
+                    a = kb.reset_override(m.group(1), req.get("author", ""), user=user)
+                    return self._send(kb.public(a, user) if a else {"ok": True})
+                return self._send(kb.public(kb.save_override(m.group(1), req.get("patch") or {}, req.get("author", ""), req.get("note", ""), user=user), user))
             m = re.fullmatch(r"/api/projects/([0-9]{8}-[0-9a-f]{6})/hide", self.path)
             if m:
                 return self._send(pipeline.set_hidden(m.group(1), req.get("hidden", True)))
             if self.path == "/api/rebuild":
                 return self._sse(lambda emit: pipeline.rebuild(req["project"], req["ir"], emit))
             self._send({"error": "없음"}, code=404)
-        except Exception as e:
-            self._send({"error": f"{type(e).__name__}: {e}"}, code=400)
+        except PermissionError as e:  # 공유 지식 DB: 만든 사람이나 관리자만
+            self._send({"error": str(e)}, code=403)
+        except (FileNotFoundError, KeyError):
+            self._send({"error": "없음"}, code=404)
+        except (ValueError, TypeError) as e:  # 입력 오류
+            self._send({"error": scrub(f"{type(e).__name__}: {e}")}, code=400)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            self._send({"error": "서버 내부 오류"}, code=500)
 
 
 def cli(text, task="auto"):

@@ -88,7 +88,7 @@ def chat(system, messages, model=None, on_token=None, json_mode=False, images=No
                 continue
             raise RuntimeError(f"Ollama HTTP {e.code}: {msg[:300]}")
         except urllib.error.URLError as e:
-            raise RuntimeError(f"LLM 서버 연결 실패 ({LLM_BASE}): {e.reason}")
+            raise RuntimeError(f"LLM 서버 연결 실패: {e.reason}")
 
 
 def models():

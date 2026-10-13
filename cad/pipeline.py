@@ -18,7 +18,7 @@ import threading
 import time
 
 from . import assembly, assembly_draw, dxfedit, dxfkit, ict, ict_draw, kb, llm, part2d, part3d, plant, svg
-from .util import ROOT, dump_json, extract_json, load_json, read, resource, write
+from .util import ROOT, dump_json, extract_json, load_json, read, resource, scrub, write
 
 WS = os.environ.get("WORKSPACE") or os.path.join(ROOT, "_workspace")
 _TL = threading.local()  # 요청 스레드별 사용자 작업 폴더 (app.user_ws → use_ws). 없으면 WS
@@ -773,6 +773,8 @@ def report(p, r):
 
 
 def finish(p, r, outdir, emit):
+    if r.get("error"):
+        r["error"] = scrub(r["error"])  # 보고서·프로젝트 JSON 에 서버 경로·내부 주소가 남지 않게
     r["files"] = {**(r.get("files") or {}), "report.md": "검증 보고서"}
     write(os.path.join(outdir, "report.md"), report(p, r))
     p["revisions"].append({k: v for k, v in r.items() if k not in ("raw",)})
