@@ -134,7 +134,16 @@ function esc(s){ return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&l
 function fileurl(rev, f, dl){ return `api/projects/${P.id}/${rev}/${encodeURIComponent(f)}${dl?"?dl=1":""}`; }
 
 // ── 테마·모델 ─────────────────────────────────────────
-if (localStorage.cadTheme==="dark") document.body.classList.add("dark");
+// 포털을 거쳐 열렸고(html[data-ag-theme]) classic-light 가 아니면 🌙 토글을 숨기고 포털 테마를 따름
+// (어둡게도 포털 CSS 가 칠하므로 body.dark 는 끔 — 토글 저장값은 지우지 않고 무시). classic-light·단독 실행은 예전대로 토글.
+function portalTheme(){ const t=document.documentElement.dataset.agTheme||""; return t&&t!=="classic-light"?t:""; }
+function applyTheme(){
+  const t=portalTheme(); let saved=false; try{ saved=localStorage.cadTheme==="dark"; }catch(e){}
+  $("theme").style.display=t?"none":"";
+  document.body.classList.toggle("dark", t?false:saved);
+}
+addEventListener("ag-theme", applyTheme);
+applyTheme();
 $("theme").onclick=()=>{ document.body.classList.toggle("dark"); try{localStorage.cadTheme=document.body.classList.contains("dark")?"dark":"light"}catch(e){} };
 fetch("api/models").then(r=>r.json()).then(j=>{ const s=$("model"); (j.models||[]).forEach(m=>{const o=document.createElement("option");o.textContent=m;s.appendChild(o)}); s.value=j.default; if(j.error) log("LLM 서버: "+j.error); });
 
