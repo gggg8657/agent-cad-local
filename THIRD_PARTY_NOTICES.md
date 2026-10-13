@@ -66,4 +66,4 @@
 
 ## 이 저장소의 원저작물
 
-`app.py`, `ui.html`, `cad/*.py`, `prompts/*.md`, `rules/*.json`, `library/*.json`, `standards/*.json`, `kb/`, `sample/make_sample.py`, `gt/*.json`, `bench_gt.py`, `selftest.py`, `setup.sh`, `pack.sh`, `README.md`, `GOAL.md`, `local_unified_cad_agent_architecture.md` — DongJu Kim (gggg8657), MIT (`LICENSE`). 단 `gt/msr_ureca_like.json` 의 바탕이 된 그림은 위 "확인 필요" 참고.
+`app.py`, `ui.html`, `cad/*.py`, `prompts/*.md`, `rules/*.json`, `library/*.json`, `standards/*.json`, `kb/`, `sample/make_sample.py`, `gt/*.json`, `bench_gt.py`, `selftest.py`, `setup.sh`, `pack.sh`, `README.md`, `GOAL.md`, `local_unified_cad_agent_architecture.md` — DongJu Kim (gggg8657), PolyForm Noncommercial 1.0.0 (`LICENSE`). 단 `gt/msr_ureca_like.json` 의 바탕이 된 그림은 위 "확인 필요" 참고.
