@@ -7,6 +7,7 @@ import re
 import shutil
 import sys
 import tempfile
+for _k in ("PORTAL_JOBS_URL", "PORTAL_JOBS_TOKEN", "PORTAL_JOBS_TOOL"): os.environ.pop(_k, None)   # setup.sh 가 포털 환경에서 돌려도 시험 작업을 진짜 🔔 로 보내지 않게
 
 WS = tempfile.mkdtemp(prefix="cadtest-")
 os.environ["WORKSPACE"] = WS
