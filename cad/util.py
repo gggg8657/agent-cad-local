@@ -85,8 +85,24 @@ def extract_json(text):
 
 
 # ── 파라미터 수식 ("W/2-10", "sqrt(D)") 안전 평가 ─────────────────────────
+# 크기 상한 — 공유 KB 검증식·IR 에 `9**9**9**9` 같은 식을 넣어 서버(GIL)를 멈추게 하지 못하게
+MAX_EXPR_LEN = 1000      # 식 글자 수
+MAX_CONST = 1e100        # 식에 쓴 숫자 상수의 절댓값
+MAX_POW_EXP = 64         # 거듭제곱 지수의 절댓값
+MAX_POW_BASE = 1e100     # 거듭제곱 밑의 절댓값
+MAX_INT_BITS = 4096      # 중간 결과 정수 크기(비트)
+
+
+def _pow(a, b):
+    if abs(b) > MAX_POW_EXP:
+        raise ValueError(f"거듭제곱 지수가 너무 큼(|지수| ≤ {MAX_POW_EXP})")
+    if abs(a) > MAX_POW_BASE:
+        raise ValueError("거듭제곱 밑이 너무 큼")
+    return operator.pow(a, b)
+
+
 _OPS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv,
-        ast.Pow: operator.pow, ast.Mod: operator.mod, ast.FloorDiv: operator.floordiv, ast.USub: operator.neg, ast.UAdd: operator.pos}
+        ast.Pow: _pow, ast.Mod: operator.mod, ast.FloorDiv: operator.floordiv, ast.USub: operator.neg, ast.UAdd: operator.pos}
 _CMP = {ast.Lt: operator.lt, ast.LtE: operator.le, ast.Gt: operator.gt, ast.GtE: operator.ge, ast.Eq: operator.eq, ast.NotEq: operator.ne}
 _FUNCS = {"sqrt": math.sqrt, "sin": lambda d: math.sin(math.radians(d)), "cos": lambda d: math.cos(math.radians(d)),
           "tan": lambda d: math.tan(math.radians(d)), "min": min, "max": max, "abs": abs, "round": round, "ceil": math.ceil, "floor": math.floor}
@@ -97,6 +113,8 @@ def safe_eval(expr, names):
         if isinstance(n, ast.Expression):
             return ev(n.body)
         if isinstance(n, ast.Constant) and isinstance(n.value, (int, float)):
+            if abs(n.value) > MAX_CONST:
+                raise ValueError("수식의 숫자가 너무 큼")
             return n.value
         if isinstance(n, ast.Name):
             if n.id in names:
@@ -105,7 +123,10 @@ def safe_eval(expr, names):
                 return math.pi
             raise ValueError(f"알 수 없는 파라미터 {n.id!r}")
         if isinstance(n, ast.BinOp) and type(n.op) in _OPS:
-            return _OPS[type(n.op)](ev(n.left), ev(n.right))
+            r = _OPS[type(n.op)](ev(n.left), ev(n.right))
+            if isinstance(r, int) and r.bit_length() > MAX_INT_BITS:
+                raise ValueError("수식 중간 결과가 너무 큼")
+            return r
         if isinstance(n, ast.UnaryOp) and type(n.op) in _OPS:
             return _OPS[type(n.op)](ev(n.operand))
         if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in _FUNCS:
@@ -126,7 +147,10 @@ def safe_eval(expr, names):
         if isinstance(n, ast.IfExp):
             return ev(n.body) if ev(n.test) else ev(n.orelse)
         raise ValueError(f"허용되지 않는 수식: {ast.dump(n)[:60]}")
-    return float(ev(ast.parse(str(expr).strip(), mode="eval")))
+    src = str(expr).strip()
+    if len(src) > MAX_EXPR_LEN:
+        raise ValueError(f"수식이 너무 김(최대 {MAX_EXPR_LEN}자)")
+    return float(ev(ast.parse(src, mode="eval")))
 
 
 TEXT_KEYS = {"name", "id", "type", "op", "face", "edges", "material", "text", "kind", "unit", "plane", "pattern", "mode", "note",
