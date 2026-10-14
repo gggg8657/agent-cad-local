@@ -10,10 +10,12 @@ import json
 import mimetypes
 import os
 import re
+import secrets
 import sys
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import portal_jobs
 from cad import llm, pipeline
 from cad.util import ROOT, read, resource, scrub
 
@@ -39,6 +41,34 @@ def user_ws(h):
     d = os.path.join(WS, "u", re.sub(r"[^A-Za-z0-9_.-]", "_", u)[:64] or "_")
     os.makedirs(d, exist_ok=True)
     return d
+
+
+PID_RE = r"[0-9]{8}-[0-9a-f]{6}"
+ST = {"pass": "통과", "warnings": "경고", "errors": "규칙 위반", "failed": "실패"}
+
+
+def job_emit(h, emit, title, pid=None):
+    """포털 작업 알림(🔔) — SSE emit 을 감싸 시작·프로젝트 확정·완료(done 이벤트)·오류를 알린다. 포털 밖에서 띄웠으면 아무 일도 안 함.
+    link 는 이 도구 화면에서 그 프로젝트(/#<pid>)·리비전(/#<pid>/R03)을 여는 주소"""
+    user, j = agent_user(h), {"id": "cad-" + secrets.token_hex(5), "link": "/#" + pid if isinstance(pid, str) and re.fullmatch(PID_RE, pid) else "/", "end": False}
+
+    def note(status, message=""):
+        portal_jobs.notify(user, status, id=j["id"], title=title, link=j["link"], message=message)
+
+    def wrapped(ev):
+        d = ev.get("done")
+        if isinstance(ev.get("project"), str) and j["link"] != "/#" + ev["project"]:
+            j["link"] = "/#" + ev["project"]
+            note("running")
+        elif isinstance(d, dict) and not j["end"]:
+            j["end"], j["link"] = True, f"/#{d.get('project')}/{d.get('rev')}"
+            note("failed" if d.get("status") == "failed" else "done", f"{d.get('rev')} · {ST.get(d.get('status'), d.get('status'))}")
+        elif ev.get("error") and not j["end"]:
+            j["end"] = True
+            note("failed", "오류로 중단")
+        emit(ev)
+    note("running")
+    return wrapped
 
 
 class H(BaseHTTPRequestHandler):
@@ -123,7 +153,7 @@ class H(BaseHTTPRequestHandler):
             traceback.print_exc()
             self._send({"error": "서버 내부 오류"}, code=500)
 
-    def _sse(self, fn):
+    def _sse(self, fn, job=None):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
@@ -140,6 +170,8 @@ class H(BaseHTTPRequestHandler):
                 self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError):
                 pass
+        if job:
+            emit = job_emit(self, emit, *job)
         try:
             fn(emit)
         except Exception as e:
@@ -166,7 +198,8 @@ class H(BaseHTTPRequestHandler):
                 if not text:
                     return self._send({"error": "빈 요청"}, code=400)
                 return self._sse(lambda emit: pipeline.run(text, req.get("task") or "auto", req.get("project"), req.get("upload"),
-                                                           req.get("model"), emit, req.get("gt") or None, req.get("owner")))
+                                                           req.get("model"), emit, req.get("gt") or None, req.get("owner")),
+                                 ("CAD — " + text.splitlines()[0][:60], req.get("project")))
             m = re.fullmatch(r"/api/kb/([a-z0-9_]+)(/reset)?", self.path)
             if m:
                 from cad import kb
@@ -179,7 +212,8 @@ class H(BaseHTTPRequestHandler):
             if m:
                 return self._send(pipeline.set_hidden(m.group(1), req.get("hidden", True)))
             if self.path == "/api/rebuild":
-                return self._sse(lambda emit: pipeline.rebuild(req["project"], req["ir"], emit))
+                return self._sse(lambda emit: pipeline.rebuild(req["project"], req["ir"], emit),
+                                 ("CAD IR 재빌드 — " + str(req.get("project"))[:16], req.get("project")))
             self._send({"error": "없음"}, code=404)
         except PermissionError as e:  # 공유 지식 DB: 만든 사람이나 관리자만
             self._send({"error": str(e)}, code=403)

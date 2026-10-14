@@ -98,6 +98,8 @@ venv/bin/python selftest.py      # LLM 없이 5개 작업 + 수리 루프 + 재�
 
 프로젝트·업로드는 사용자별로 따로 저장합니다(포털 접속자 기준, 포털이 넘기는 `X-Agent-User` 헤더 → `$WORKSPACE/u/<사용자>/projects`·`uploads`). 서버 주인(헤더 없음·`owner`)은 `$WORKSPACE` 그대로라 예전 기록도 보입니다. 지식 DB 수정본(`kb_overrides`)은 팀이 함께 쓰는 기준이라 **공유됨**.
 
+포털에서 띄우면 생성·후속 지시·IR 재빌드의 시작/완료/실패를 포털 **작업 알림(🔔)**에 알립니다(`portal_jobs.py`, 포털이 주는 `PORTAL_JOBS_*` 환경변수가 없으면 아무 일도 안 함). 알림을 누르면 이 화면에서 그 프로젝트·리비전(`/#<project>/R03`)이 열립니다.
+
 ## 구조
 
 ```

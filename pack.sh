@@ -6,7 +6,7 @@ set -euo pipefail; cd "$(dirname "$0")"
 PLAT="${PLAT:-manylinux_2_28_x86_64}"; PYV="${PYV:-3.12}"
 STAGE=dist-offline/agent-cad-local-linux-x64; rm -rf "$STAGE"; mkdir -p "$STAGE/wheels"
 pip download -q -r requirements.txt -d "$STAGE/wheels" --platform "$PLAT" --platform manylinux2014_x86_64 --python-version "$PYV" --only-binary=:all:
-cp -r app.py ui.html cad prompts rules library standards static sample gt kb bench_gt.py selftest.py setup.sh requirements.txt README.md GOAL.md NOTICE LICENSE \
+cp -r app.py portal_jobs.py ui.html cad prompts rules library standards static sample gt kb bench_gt.py selftest.py setup.sh requirements.txt README.md GOAL.md NOTICE LICENSE \
       local_unified_cad_agent_architecture.md "$STAGE/"
 find "$STAGE" -name __pycache__ -prune -exec rm -rf {} +
 cat > "$STAGE/INSTALL.md" <<INS

@@ -343,3 +343,39 @@ try:
     print("selftest OK")
 finally:
     shutil.rmtree(WS, ignore_errors=True)
+
+# 포털 작업 알림(portal_jobs): 환경변수 없으면 False(아무 일 없음), 있으면 가짜 포털로 POST + 토큰 헤더
+import json as _json, os as _os, threading as _th, portal_jobs as _pj
+from http.server import BaseHTTPRequestHandler as _BH, HTTPServer as _HS
+_env0 = dict(_os.environ)
+try:
+    for _k in ("PORTAL_JOBS_URL", "PORTAL_JOBS_TOKEN", "PORTAL_JOBS_TOOL"): _os.environ.pop(_k, None)
+    assert _pj.notify("alice", "running", id="j1", title="t") is False and _pj.enabled() is False
+    _got = []
+    class _P(_BH):
+        def log_message(self, *a): pass
+        def do_POST(self):
+            _got.append((self.headers.get("X-Portal-Jobs-Token"), _json.loads(self.rfile.read(int(self.headers["Content-Length"])))))
+            self.send_response(200); self.send_header("Content-Length", "2"); self.end_headers(); self.wfile.write(b"{}")
+    _srv = _HS(("127.0.0.1", 0), _P); _th.Thread(target=_srv.serve_forever, daemon=True).start()
+    _os.environ.update(PORTAL_JOBS_URL=f"http://127.0.0.1:{_srv.server_address[1]}/api/internal/jobs", PORTAL_JOBS_TOKEN="tok-test", PORTAL_JOBS_TOOL="agent-cad-local")
+    _os.environ.pop("http_proxy", None); _os.environ.pop("HTTP_PROXY", None)
+    import app as _app
+    _evs = []
+    _w = _app.job_emit(type("_H", (), {"headers": {"X-Agent-User": "alice"}})(), _evs.append, "CAD — 브래킷")
+    for _ev in ({"project": "20261014-abcdef", "task": "part3d"}, {"stage": "build", "msg": "m"},
+                {"done": {"project": "20261014-abcdef", "rev": "R01", "status": "warnings"}}, {"error": "뒤늦은 오류"}):
+        _w(_ev)
+    assert len(_evs) == 4, "감싼 emit 이 이벤트를 그대로 넘김"
+    assert _pj.flush() and [g[1]["status"] for g in _got] == ["running", "running", "done"], _got
+    assert _got[0][1]["link"] == "/" and _got[1][1]["link"] == "/#20261014-abcdef" and len({g[1]["id"] for g in _got}) == 1, _got
+    _tok, _p = _got[-1]
+    assert _tok == "tok-test" and _p["tool"] == "agent-cad-local" and _p["user"] == "alice" and _p["status"] == "done", _p
+    assert _p["link"] == "/#20261014-abcdef/R01" and _p["message"] == "R01 · 경고" and _p["title"] == "CAD — 브래킷", _p
+    _got.clear(); _w = _app.job_emit(type("_H", (), {"headers": {}})(), lambda ev: None, "CAD IR 재빌드", "20261014-abcdef")
+    _w({"error": "KeyError"}); assert _pj.flush() and [(g[1]["status"], g[1]["user"], g[1]["link"]) for g in _got] == [("running", "owner", "/#20261014-abcdef"), ("failed", "owner", "/#20261014-abcdef")], _got
+    assert _pj.notify("alice", "bogus", id="x") is False
+    _srv.shutdown()
+finally:
+    _os.environ.clear(); _os.environ.update(_env0)
+print("selftest 포털 작업 알림 OK")

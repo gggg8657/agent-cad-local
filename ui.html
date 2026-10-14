@@ -241,6 +241,8 @@ async function refreshList(){ const ps=await (await fetch(`api/projects?owner=${
     ul.appendChild(li); }); }
 $("allp").onchange=refreshList;
 refreshList();
+{ const m=location.hash.match(/^#(\d{8}-[0-9a-f]{6})(?:\/(R\d{2}))?$/);  // 포털 작업 알림(🔔)에서 연 프로젝트·리비전
+  if(m) fetch("api/projects/"+m[1]).then(r=>{ if(r.ok) openProject(m[1], m[2]); }).catch(()=>{}); }
 async function openProject(pid, rev){
   P=await (await fetch("api/projects/"+pid)).json(); $("task").value=P.task; $("task").disabled=true;
   $("pinfo").textContent=`${P.id} · ${LABEL[P.task]}${P.input?" · 입력 "+P.input:""}`;
