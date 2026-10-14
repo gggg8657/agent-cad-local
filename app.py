@@ -14,6 +14,7 @@ import secrets
 import sys
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import portal_auth  # 포털 서명 확인 관문·오류 문장 정리(원본 agent-page-portal/sdk/portal_auth.py)
 
 import portal_jobs
 from cad import llm, pipeline
@@ -242,4 +243,4 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--cli":
         sys.exit(cli(sys.argv[2] if len(sys.argv) > 2 else sys.stdin.read(), sys.argv[3] if len(sys.argv) > 3 else "auto"))
     print(f"agent-cad-local → http://localhost:{PORT}  (model={llm.MODEL}, llm={llm.LLM_API} {llm.LLM_BASE}, data={pipeline.WS})")
-    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), __import__("portal_auth").install(H, "agent-cad-local")).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), portal_auth.install(H, "agent-cad-local")).serve_forever()
