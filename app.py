@@ -242,4 +242,4 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--cli":
         sys.exit(cli(sys.argv[2] if len(sys.argv) > 2 else sys.stdin.read(), sys.argv[3] if len(sys.argv) > 3 else "auto"))
     print(f"agent-cad-local → http://localhost:{PORT}  (model={llm.MODEL}, llm={llm.LLM_API} {llm.LLM_BASE}, data={pipeline.WS})")
-    ThreadingHTTPServer((os.environ.get("BIND", ""), PORT), H).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), __import__("portal_auth").install(H, "agent-cad-local")).serve_forever()
