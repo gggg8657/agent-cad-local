@@ -7,6 +7,12 @@ from ezdxf.enums import TextEntityAlignment
 
 from .util import resource
 
+try:
+    from zoneinfo import ZoneInfo
+    KST = ZoneInfo("Asia/Seoul")
+except Exception:  # tzdata 없는 환경 — 한국은 일광절약시간 없음
+    KST = datetime.timezone(datetime.timedelta(hours=9), "KST")
+
 STD = resource("standards", "ict_v1.json")
 LIB = resource("library", "ict.json")
 STYLE = "KR"
@@ -119,7 +125,7 @@ def frame(msp, bbox, title, sub="", scale=1, paper="A1", rev="R00", kind="ICT", 
     tx0, ty1 = tx1 - tw, ty0 + th
     msp.add_lwpolyline([(tx0, ty0), (tx1, ty0), (tx1, ty1), (tx0, ty1)], close=True, dxfattribs={"layer": L})
     rows = [("도면명", title), ("내용", sub or "-"), ("축척", f"1:{scale}" if scale != 1 else "1:1"),
-            ("일자 / REV", f"{datetime.date.today()}  /  {rev}"), ("작성", "agent-cad-local (AI 초안)")] + list(extra)
+            ("일자 / REV", f"{datetime.datetime.now(KST).date()}  /  {rev}"), ("작성", "agent-cad-local (AI 초안)")] + list(extra)
     rh = th / (len(rows) + 1)
     for i, (k, v) in enumerate(rows):
         y = ty1 - (i + 1) * rh

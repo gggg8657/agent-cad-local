@@ -130,6 +130,9 @@ EX.forEach(([t,k,q,g]) => { const b=document.createElement("button"); b.textCont
 fetch("api/gt").then(r=>r.json()).then(gs=>gs.forEach(g=>{const o=document.createElement("option");o.value=g.id;o.textContent=g.name;$("gt").appendChild(o)}));
 
 function log(s){ const l=$("log"); l.textContent += s+"\n"; l.scrollTop=l.scrollHeight; }
+// 저장 시각은 UTC(시간대 없으면 UTC) — 화면에는 한국 시간으로
+const KST_FMT=new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"});
+function kst(ts){ const s=String(ts??""); if(!s) return ""; const d=new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(s)||!/T\d/.test(s)?s:s+"Z"); return isNaN(d)?s:KST_FMT.format(d); }
 function esc(s){ return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function fileurl(rev, f, dl){ return `api/projects/${P.id}/${rev}/${encodeURIComponent(f)}${dl?"?dl=1":""}`; }
 
@@ -170,7 +173,7 @@ async function kbShow(id){ const a=await (await fetch("api/kb/"+id)).json(); con
    <div class="bar" style="margin-top:10px"><input id="kbWho" placeholder="수정자" style="width:110px"><input id="kbWhy" placeholder="수정 사유 (예: 사내 설계기준 반영)" style="flex:1">
      <button class="primary" id="kbSave">저장</button><button id="kbReset">원본으로</button><button id="kbClone">복제해 새 원형</button><button id="kbUse">이 원형으로 그리기</button></div>
    <div id="kbMsg" style="font-size:12px;color:var(--muted)"></div>
-   <h3>수정 이력</h3><ul>${(a.history||[]).slice().reverse().map(h=>`<li>${esc(h.ts)} · ${esc(h.author)} · ${esc((h.fields||[]).join(","))} — ${esc(h.note||"")}</li>`).join("")||"<li>없음 (원본)</li>"}</ul>
+   <h3>수정 이력</h3><ul>${(a.history||[]).slice().reverse().map(h=>`<li>${esc(kst(h.ts))} · ${esc(h.author)} · ${esc((h.fields||[]).join(","))} — ${esc(h.note||"")}</li>`).join("")||"<li>없음 (원본)</li>"}</ul>
    <details><summary>전체 JSON (기기·배치·사이징·루프)</summary><pre style="font-size:11px">${esc(JSON.stringify(a,null,1))}</pre></details>`;
   $("kbSave").onclick=async()=>{ let checks; try{ checks=JSON.parse($("kbC").value); }catch(e){ $("kbMsg").textContent="검증 규칙 JSON 오류: "+e.message; return; }
     const design={}; document.querySelectorAll("#kbdet td input[data-k]").forEach(i=>{ const v=parseFloat(i.value); if(!isNaN(v)&&v!==D[i.dataset.k].v) design[i.dataset.k]={v}; });
