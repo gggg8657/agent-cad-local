@@ -29,7 +29,7 @@ CTYPE = {".svg": "image/svg+xml", ".dxf": "application/dxf", ".step": "applicati
 
 
 def agent_user(h):
-    """포털이 넘긴 사용자(로그인 확인됨). 관리자·서버 안 접속·헤더 없음(단독 실행) = owner"""
+    """포털이 넘긴 사용자(로그인 확인됨) — 관리자 계정도 자기 아이디(권한은 portal_auth.is_admin). 로컬 주인 토큰·헤더 없음(단독 실행) = owner"""
     return (h.headers.get("X-Agent-User") or "owner").strip() or "owner"
 
 
@@ -115,7 +115,7 @@ class H(BaseHTTPRequestHandler):
             m = re.fullmatch(r"/api/kb/([a-z0-9_]+)", path)
             if m:
                 from cad import kb
-                return self._send(kb.public(kb.get(m.group(1)), agent_user(self)))
+                return self._send(kb.public(kb.get(m.group(1)), agent_user(self), portal_auth.is_admin(self)))
             if path == "/api/gt":
                 return self._send(pipeline.list_gt())
             m = re.fullmatch(r"/api/gt/([\w\-]+)\.(png|jpg|json)", path)
@@ -204,11 +204,11 @@ class H(BaseHTTPRequestHandler):
             m = re.fullmatch(r"/api/kb/([a-z0-9_]+)(/reset)?", self.path)
             if m:
                 from cad import kb
-                user = agent_user(self)
+                user, admin = agent_user(self), portal_auth.is_admin(self)   # 관리자 계정 = 자기 아이디 + 서명된 admin 역할(기본 지식 고치기)
                 if m.group(2):
-                    a = kb.reset_override(m.group(1), req.get("author", ""), user=user)
-                    return self._send(kb.public(a, user) if a else {"ok": True})
-                return self._send(kb.public(kb.save_override(m.group(1), req.get("patch") or {}, req.get("author", ""), req.get("note", ""), user=user), user))
+                    a = kb.reset_override(m.group(1), req.get("author", ""), user=user, admin=admin)
+                    return self._send(kb.public(a, user, admin) if a else {"ok": True})
+                return self._send(kb.public(kb.save_override(m.group(1), req.get("patch") or {}, req.get("author", ""), req.get("note", ""), user=user, admin=admin), user, admin))
             m = re.fullmatch(r"/api/projects/([0-9]{8}-[0-9a-f]{6})/hide", self.path)
             if m:
                 return self._send(pipeline.set_hidden(m.group(1), req.get("hidden", True)))

@@ -115,39 +115,40 @@ def _owner_of(aid):
     return ov.get("created_by") or "owner"
 
 
-def can_edit(aid, user):
-    """user = 포털의 X-Agent-User. 아직 없는 id(새 원형 추가)는 누구나."""
-    if user == "owner":
+def can_edit(aid, user, admin=False):
+    """user = 포털의 X-Agent-User. admin = 관리자(포털이 서명한 admin 역할 — owner 는 늘 관리자). 아직 없는 id(새 원형 추가)는 누구나."""
+    if user == "owner" or admin:
         return True
     if not os.path.exists(os.path.join(ARCH, aid + ".json")) and not os.path.exists(os.path.join(OVR, aid + ".json")):
         return True
     return _owner_of(aid) == user
 
 
-def public(a, user):
+def public(a, user, admin=False):
     """응답용: 만든 사람 id 는 관리자에게만, 대신 can_edit 표시."""
     a = dict(a)
     by = a.pop("created_by", None)
-    a["can_edit"] = user == "owner" or (bool(by) and by == user and not os.path.exists(os.path.join(ARCH, a["id"] + ".json")))
-    if user == "owner":
+    admin = admin or user == "owner"
+    a["can_edit"] = admin or (bool(by) and by == user and not os.path.exists(os.path.join(ARCH, a["id"] + ".json")))
+    if admin:
         a["created_by"] = by
     else:
         a["history"] = [{k: v for k, v in h.items() if k != "user"} for h in a.get("history", [])]
     return a
 
 
-def _check(aid, user, what):
-    if not can_edit(aid, user):
+def _check(aid, user, what, admin=False):
+    if not can_edit(aid, user, admin):
         raise PermissionError(f"이 원형은 {'기본 지식이라 관리자만' if _owner_of(aid) == 'owner' else '만든 사람이나 관리자만'} {what} 수 있습니다")
 
 
-def save_override(aid, patch, author="", note="", user="owner"):
+def save_override(aid, patch, author="", note="", user="owner", admin=False):
     """patch: EDITABLE 필드의 새 값. 새 원형이면 patch 에 id·name·kind 등 전체. 이력에 누가·언제·무엇을·왜."""
     if not re.fullmatch(r"[a-z0-9_]{2,40}", aid or ""):
         raise ValueError("원형 id 는 영소문자·숫자·_ 2~40자")
     if not isinstance(patch, dict):
         raise ValueError("patch 는 객체여야 함")
-    _check(aid, user, "고칠")
+    _check(aid, user, "고칠", admin)
     os.makedirs(OVR, exist_ok=True)
     p = os.path.join(OVR, aid + ".json")
     ov = load_json(p) if os.path.exists(p) else {}
@@ -172,10 +173,10 @@ def save_override(aid, patch, author="", note="", user="owner"):
     return get(aid)
 
 
-def reset_override(aid, author="", user="owner"):
+def reset_override(aid, author="", user="owner", admin=False):
     if not os.path.exists(os.path.join(ARCH, aid + ".json")) and not os.path.exists(os.path.join(OVR, aid + ".json")):
         raise KeyError(aid)
-    _check(aid, user, "되돌릴")
+    _check(aid, user, "되돌릴", admin)
     p = os.path.join(OVR, aid + ".json")
     if os.path.exists(p):
         os.rename(p, p + "." + datetime.datetime.now().strftime("%Y%m%d%H%M%S") + ".bak")

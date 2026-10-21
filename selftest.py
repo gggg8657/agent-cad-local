@@ -331,6 +331,32 @@ try:
        and kb.public(kb.get("st_alice"), "alice")["can_edit"], "응답에 만든 사람 id 대신 can_edit")
     kb.reset_override("st_alice", user="owner")
     ok("st_alice" not in kb.load_all(), "관리자는 남의 원형도 되돌림")
+    # 관리자 계정 분리(포털 관문 그대로): 관리자 두 계정은 각자 u/<id>, 둘 다 기본 지식을 고침. 서명 없는/위장 역할은 권한 없음
+    import app, threading, urllib.request, urllib.error
+    from http.server import ThreadingHTTPServer
+    os.environ["PORTAL_TOOL_KEY"] = "selftest-" + "k" * 40
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), app.portal_auth.install(app.H, "agent-cad-local"))
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+
+    def call(path, hd, body=None):
+        req = urllib.request.Request(f"http://127.0.0.1:{srv.server_address[1]}{path}", json.dumps(body).encode() if body is not None else None,
+                                     {**hd, "Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                return r.status, json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            return e.code, None
+    sig = lambda u, role=None: app.portal_auth.sign(u, "agent-cad-local", role=role)
+    forged = {**sig("bob"), "X-Agent-Role": "admin", "X-Agent-Role-Auth": sig("adm1", role="admin")["X-Agent-Role-Auth"]}
+    ok(call("/api/kb/sfr_pool", {**sig("bob"), "X-Agent-Role": "admin"})[1]["can_edit"] is False and call("/api/kb/sfr_pool/reset", forged, {})[0] == 403,
+       "서명 없는/옮겨 붙인 역할로는 기본 원형을 못 고침")
+    for u in ("adm1", "adm2"):
+        ok(call("/api/kb/sfr_pool", sig(u, role="admin"))[1]["can_edit"] and call("/api/kb/sfr_pool/reset", sig(u, role="admin"), {"author": "t"})[0] == 200,
+           f"관리자 계정 {u}: 기본 원형 관리 권한")
+        app.user_ws(type("R", (), {"headers": sig(u, role="admin")})())
+    ok({"adm1", "adm2"} <= set(os.listdir(os.path.join(app.WS, "u"))), "관리자 계정은 각자 작업 폴더(루트를 같이 쓰지 않음)")
+    ok(call("/api/kb/sfr_pool", {"X-Agent-User": "adm1", "X-Agent-Role": "admin"})[0] == 401, "서명 없으면 거부")
+    srv.shutdown(); os.environ.pop("PORTAL_TOOL_KEY")
     ok(util.scrub("x /home/u/a/b.json http://127.0.0.1:11436/api 10.1.2.3:8000") == "x …/b.json (내부 주소) (내부 주소)", "응답 문구에서 경로·내부 주소 지움")
     # 이미지 선택 입력: 명령에 작업 단서가 있으면 명령 우선
     ok(pipeline.route("이 도면대로 3D 브래킷", False, has_img=True, img=b"x")[0] == "part3d", "이미지 + '3D 브래킷' 명령 → 3D 부품 (명령 우선)")
